@@ -76,8 +76,12 @@ check_migrations: migrate## Check if alembic revision command with autogenerate 
 	flask db check
 
 .PHONY: ci
-ci: lint mypy_all check_migrations test_all ## Run all check that would be run in CI
+ci: .env lint mypy_all check_migrations test_all ## Run all check that would be run in CI
 	:
+
+.PHONY: local_run
+local_run: .env migrate ##  Run the app locally
+	flask run --debug --port 8080
 
 .PHONY: help
 help: ## Display this help text
