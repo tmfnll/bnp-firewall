@@ -1,0 +1,12 @@
+services:
+  fireflow:
+    volumes:
+      - .:/app:cached
+      - ./instances:/instances:cached
+    build:
+      context: .
+      target: dev
+    profiles:
+      - app
+    ports:
+      - '8080:80'
