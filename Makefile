@@ -64,7 +64,7 @@ fmt: remove_unused_imports sort_imports apply_code_style ## Format any changed f
 
 .PHONY: test_all
 test_all: ## Run all the tests.
-	pytest --cov=. --cov-report=html --cov-fail-under=$(MINIMUM_COVERAGE) .
+	pytest --cov=. --cov-report=html --cov-fail-under=$(MINIMUM_COVERAGE) -Werror .
 
 
 .PHONY: migrate
