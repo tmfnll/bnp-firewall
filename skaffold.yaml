@@ -1,0 +1,20 @@
+apiVersion: skaffold/v4beta13
+kind: Config
+
+build:
+  local:
+    useBuildkit: true
+    useDockerCLI: true
+  artifacts:
+    - image: fireflow
+      context: .
+      docker:
+        target: dev
+
+deploy:
+  helm:
+    releases:
+      - name: fireflow
+        chartPath: helm
+        valuesFiles:
+          - helm/values.yaml
