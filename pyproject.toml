@@ -1,0 +1,53 @@
+[project]
+name = "bnp-firewall"
+
+[tool.poetry]
+name = "bnp-firewall"
+version = "0.1.0"
+description = ""
+authors = ["Tom Finill <<tomfinill@gmail.com>>"]
+readme = "README.md"
+package-mode = false
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.dependencies]
+python = "^3.13"
+sqlalchemy = "^2.0.40"
+alembic = "^1.16.4"
+flask = "^3.1.2"
+flask-sqlalchemy = "^3.1.1"
+pydantic-settings = "^2.10.1"
+flask-migrate = "^4.1.0"
+flask-smorest = "^0.46.1"
+flask-httpauth = "^4.8.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "^25.1.0"
+mypy = "^1.17.1"
+isort = {extras = ["pyproject"], version = "^6.0.1"}
+autoflake = "^2.3.1"
+flake8 = "^7.3.0"
+types-flask-migrate = "^4.1.0.20250809"
+pytest = "^8.4.1"
+pytest-cov = "^6.2.1"
+factory-boy = "^3.3.3"
+
+
+[tool.black]
+line-length = 80
+
+[tool.isort]
+profile = "black"
+line_length = 80
+
+[[tool.mypy.overrides]]
+module = "flask_smorest.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "flask_httpauth.*"
+ignore_missing_imports = true
