@@ -7,10 +7,15 @@ from firewalls.models import (
     FirewallAction,
     FirewallRule,
     Packet,
+    ValidationError,
 )
 from firewalls.tests.factories import (
     FilteringPolicyFactory,
+    FirewallFactory,
+    FirewallRuleDestinationFactory,
     FirewallRuleFactory,
+    FirewallRulePortFactory,
+    FirewallRuleSourceFactory,
 )
 
 
@@ -36,13 +41,27 @@ class TestFirewallRule:
 
     @pytest.fixture
     def rule(self, rule_deleted_at: datetime | None) -> FirewallRule:
-        return FirewallRuleFactory.create(
-            source_address_pattern=r"\A100\.100\.100\.\d{1,3}\Z",
-            source_port=8080,
-            destination_address_pattern=r"\A99\.99\.99\.99\Z",
-            destination_port=80,
+        rule_ = FirewallRuleFactory.build(
+            sources=[],
+            destinations=[],
             deleted_at=rule_deleted_at,
         )
+
+        rule_.sources.append(
+            FirewallRuleSourceFactory.build(
+                address="100.100.100.0/24",
+                port=8080,
+            ),
+        )
+
+        rule_.destinations.append(
+            FirewallRuleDestinationFactory.build(
+                address="99.99.99.99",
+                port=80,
+            )
+        )
+
+        return rule_
 
     @pytest.mark.parametrize(
         (
@@ -133,18 +152,18 @@ class TestFilteringPolicy:
         return [
             FirewallRuleFactory.create(
                 filtering_policy=filtering_policy,
-                source_address_pattern=r"\A100\.100\.100.\d{1,3}\Z",
-                source_port=8080,
-                destination_address_pattern=r"\A99\.99\.99\.99\Z",
-                destination_port=80,
+                sources__address="100.100.100.0/24",
+                sources__port=8080,
+                destinations__address="99.99.99.99",
+                destinations__port=80,
                 action=FirewallAction.ALLOW,
             ),
             FirewallRuleFactory.create(
                 filtering_policy=filtering_policy,
-                source_address_pattern=r"\A200\.200\.200\.\d{1,3}\Z",
-                source_port=8080,
-                destination_address_pattern=r"\A77\.77\.77\.77\Z",
-                destination_port=80,
+                sources__address="200.200.200.0/24",
+                sources__port=8080,
+                destinations__address="77.77.77.77",
+                destinations__port=80,
                 action=FirewallAction.DENY,
             ),
         ]
@@ -173,7 +192,7 @@ class TestFilteringPolicy:
                 FirewallAction.DENY,
             ),
             (
-                "300.300.300.300",  # Mismatched source address
+                "255.255.255.255",  # Mismatched source address
                 8080,
                 "77.77.77.77",
                 80,
@@ -194,3 +213,89 @@ class TestFilteringPolicy:
             assert action is expected_action
         else:
             assert action is filtering_policy.default_action
+
+    @pytest.mark.parametrize(
+        ("name", "is_valid"),
+        (("foo", True), ("   foo  ", True), ("", False), ("    ", False)),
+    )
+    def test_name_validation(self, name: str, is_valid: bool) -> None:
+        if is_valid:
+            FilteringPolicyFactory.build(name=name)
+        else:
+            with pytest.raises(
+                ValidationError, match="Name cannot be empty or whitespace"
+            ):
+                FilteringPolicyFactory.build(name=name)
+
+
+class TestFirewall:
+    @pytest.mark.parametrize(
+        ("name", "is_valid"),
+        (("foo", True), ("   foo  ", True), ("", False), ("    ", False)),
+    )
+    def test_name_validation(self, name: str, is_valid: bool) -> None:
+        if is_valid:
+            FirewallFactory.build(name=name)
+        else:
+            with pytest.raises(
+                ValidationError, match="Name cannot be empty or whitespace"
+            ):
+                FirewallFactory.build(name=name)
+
+
+class TestFirewallRuleSource:
+    @pytest.mark.parametrize(
+        ("address", "is_valid"),
+        (
+            ("1.1.1.1", True),
+            ("1.1.1.0/24", True),
+            ("256.1.1.1", False),
+            ("", False),
+            ("   ", False),
+            ("invalid", False),
+            ("1.1.1.00/24", False),
+            ("1.1.1.1/33", False),
+            ("1.1.1.1/32", True),
+            ("1.1.1.0/16", False),
+            ("1.1.0.0/16", True),
+        ),
+    )
+    def test_address_validation(self, address: str, is_valid: bool) -> None:
+        if is_valid:
+            FirewallRuleSourceFactory.build(address=address)
+        else:
+            with pytest.raises(
+                ValidationError,
+                match="is not a valid IP address or subnet CIDR",
+            ):
+                FirewallRuleSourceFactory.build(address=address)
+
+    @pytest.mark.parametrize(
+        ("port", "is_valid"),
+        ((0, True), (80, True), (65535, True), (-1, False), (65536, False)),
+    )
+    def test_port_validation(self, port: int, is_valid: bool) -> None:
+        if is_valid:
+            FirewallRuleSourceFactory.build(port=port)
+        else:
+            with pytest.raises(
+                ValidationError,
+                match="is not a valid port number",
+            ):
+                FirewallRuleSourceFactory.build(port=port)
+
+
+class TestFirewallPort:
+    @pytest.mark.parametrize(
+        ("port", "is_valid"),
+        ((0, True), (80, True), (65535, True), (-1, False), (65536, False)),
+    )
+    def test_number_validation(self, port: int, is_valid: bool) -> None:
+        if is_valid:
+            FirewallRulePortFactory.build(number=port)
+        else:
+            with pytest.raises(
+                ValidationError,
+                match="is not a valid port number",
+            ):
+                FirewallRulePortFactory.build(number=port)
