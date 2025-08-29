@@ -36,6 +36,9 @@ livenessProbe:
   httpGet:
     path: /health/
     port: http
+    httpHeaders:
+      - name: Authorization
+        value: Bearer test
 readinessProbe:
   failureThreshold: 3
   periodSeconds: 10
@@ -44,6 +47,9 @@ readinessProbe:
   httpGet:
     path: /health/
     port: http
+    httpHeaders:
+      - name: Authorization
+        value: Bearer test
 startupProbe:
   failureThreshold: 60
   periodSeconds: 5
@@ -52,6 +58,9 @@ startupProbe:
   httpGet:
     path: /health/
     port: http
+    httpHeaders:
+      - name: Authorization
+        value: Bearer test
 
 
 volumes: [ ]
