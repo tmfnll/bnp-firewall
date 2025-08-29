@@ -15,10 +15,11 @@ from auth import auth
 from db import db
 from firewalls.flask.exceptions import abort_already_exists, abort_not_found
 from firewalls.flask.links import links, operation
-from firewalls.flask.shemas import BaseSchema, PageSchema
-from firewalls.flask.validations import (
-    IsValidIPAddressOrSubnetCIDR,
-    is_valid_tcp_port,
+from firewalls.flask.shemas import (
+    BaseSchema,
+    IpOrSubnetCidrField,
+    PageSchema,
+    PortField,
 )
 from firewalls.models import (
     FirewallAction,
@@ -59,12 +60,12 @@ class FirewallRuleFilteringPolicySchema(BaseSchema):
 
 
 class FirewallRuleNetworkAddressSchema(BaseSchema):
-    address = String(validate=IsValidIPAddressOrSubnetCIDR(), required=True)
-    port = Integer(validate=is_valid_tcp_port(), required=True)
+    address = IpOrSubnetCidrField(required=True)
+    port = PortField(required=True)
 
 
 class FirewallRulePortSchema(BaseSchema):
-    number = Integer(validate=is_valid_tcp_port(), required=True)
+    number = PortField(required=True)
 
 
 class FirewallRuleSchema(BaseSchema):
@@ -93,11 +94,11 @@ class FirewallRuleSchema(BaseSchema):
 
 class FirewallRuleFilterSchema(Schema):
     action = Enum(FirewallAction)
-    source_address = String(validate=IsValidIPAddressOrSubnetCIDR())
-    source_port = Integer(validate=is_valid_tcp_port())
-    destination_address = String(validate=IsValidIPAddressOrSubnetCIDR())
-    destination_port = Integer(validate=is_valid_tcp_port())
-    port = Integer(validate=is_valid_tcp_port())
+    source_address = IpOrSubnetCidrField(example=None)
+    source_port = PortField(example=None)
+    destination_address = IpOrSubnetCidrField(example=None)
+    destination_port = PortField(example=None)
+    port = PortField(example=None)
 
 
 @rules.route("/")
