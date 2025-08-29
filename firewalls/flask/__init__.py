@@ -1,1 +1,1 @@
-from .firewalls import firewalls
+from firewalls.flask.views.firewalls import firewalls
