@@ -103,7 +103,7 @@ class Firewalls(MethodView):
     @firewalls.arguments(FirewallSchema)
     @firewalls.response(201, FirewallSchema)
     @firewalls.alt_response(404, schema=ErrorSchema)
-    @firewalls.alt_response(422, schema=ErrorSchema)
+    @firewalls.alt_response(409, schema=ErrorSchema)
     def post(
         self,
         new_firewall: dict[str, Any],

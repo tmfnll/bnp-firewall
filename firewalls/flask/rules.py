@@ -136,7 +136,7 @@ class FirewallRules(MethodView):
     @rules.arguments(FirewallRuleSchema)
     @rules.response(201, FirewallRuleSchema)
     @rules.alt_response(404, schema=ErrorSchema)
-    @rules.alt_response(422, schema=ErrorSchema)
+    @rules.alt_response(409, schema=ErrorSchema)
     def post(
         self,
         new_rule_data: dict[str, Any],

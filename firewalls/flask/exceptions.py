@@ -13,4 +13,4 @@ def abort_not_found(resource: str, **ids: int) -> NoReturn:
 
 
 def abort_already_exists(resource: str) -> NoReturn:
-    abort(422, message=f"A {resource} with the same attributes already exists")
+    abort(409, message=f"A {resource} with the same attributes already exists")

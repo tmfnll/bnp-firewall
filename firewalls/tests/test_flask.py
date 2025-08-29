@@ -243,12 +243,12 @@ class TestFirewalls:
                 json=payload,
             )
 
-            assert response.status_code == 422
+            assert response.status_code == 409
             data = response.json
 
             assert data == {
-                "code": 422,
-                "status": "Unprocessable Entity",
+                "code": 409,
+                "status": "Conflict",
                 "message": "A firewall with the same attributes already exists",
             }
 
@@ -580,11 +580,11 @@ class TestFilteringPolicies:
                 json=payload,
             )
 
-            assert response.status_code == 422, response.json
+            assert response.status_code == 409, response.json
 
             assert response.json == {
-                "code": 422,
-                "status": "Unprocessable Entity",
+                "code": 409,
+                "status": "Conflict",
                 "message": "A filtering-policy with the same attributes already exists",
             }
 
@@ -1038,10 +1038,10 @@ class TestFirewallRules:
                 json=payload,
             )
 
-            assert response.status_code == 422, response.json
+            assert response.status_code == 409, response.json
             assert response.json == {
-                "code": 422,
-                "status": "Unprocessable Entity",
+                "code": 409,
+                "status": "Conflict",
                 "message": "A rule with the same attributes already exists",
             }
 
