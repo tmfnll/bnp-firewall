@@ -27,7 +27,7 @@ from .rules import (
     FirewallRulePortSchema,
     rules,
 )
-from .shemas import PageSchema
+from .shemas import BaseSchema, PageSchema
 from .validations import not_just_whitespace
 
 filtering_policies = Blueprint(
@@ -41,12 +41,12 @@ filtering_policies = Blueprint(
 filtering_policies.register_blueprint(rules)
 
 
-class FilteringPolicyFirewallSchema(Schema):
+class FilteringPolicyFirewallSchema(BaseSchema):
     id = Integer()
     name = String()
 
 
-class FilteringPolicyFirewallRuleSchema(Schema):
+class FilteringPolicyFirewallRuleSchema(BaseSchema):
     id = Integer()
 
     action = Enum(FirewallAction)
@@ -57,7 +57,7 @@ class FilteringPolicyFirewallRuleSchema(Schema):
     ports = Nested(FirewallRulePortSchema, many=True)
 
 
-class FilteringPolicySchema(Schema):
+class FilteringPolicySchema(BaseSchema):
     id = Integer(dump_only=True)
     firewall = Nested(FilteringPolicyFirewallSchema, dump_only=True)
     rules = Nested(FilteringPolicyFirewallRuleSchema, dump_only=True, many=True)

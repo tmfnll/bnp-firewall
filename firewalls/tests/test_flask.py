@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Any, Callable
+from uuid import uuid4
 
 import pytest
 from flask.testing import FlaskClient
@@ -971,6 +972,35 @@ class TestFirewallRules:
             client: FlaskClient,
             payload: dict[str, Any],
         ) -> None:
+            response = client.post(
+                f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id}/rules/",
+                json=payload,
+            )
+
+            assert response.status_code == 201, response.json
+            data = response.json
+
+            assert data is not None
+
+            assert "id" in data
+            assert data["sources"] == [
+                {"address": "100.100.100.0/24", "port": 8080}
+            ]
+            assert data["destinations"] == [
+                {"address": "200.200.200.200", "port": 9090}
+            ]
+            assert data["ports"] == [{"number": 8080}]
+            assert data["action"] == "ALLOW"
+
+        def test_it_ignores_unknown_fields(
+            self,
+            firewall: Firewall,
+            filtering_policy: FilteringPolicy,
+            client: FlaskClient,
+            payload: dict[str, Any],
+        ) -> None:
+            payload[str(uuid4())] = {str(uuid4()): [str(uuid4())]}
+
             response = client.post(
                 f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id}/rules/",
                 json=payload,
