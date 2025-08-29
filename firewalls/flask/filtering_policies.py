@@ -1,12 +1,14 @@
 from typing import Any
 
-from flask import abort, current_app
+from flask import current_app
 from flask.views import MethodView
 from flask_smorest import Blueprint
+from flask_smorest.error_handler import ErrorSchema
+from flask_smorest.pagination import PaginationParameters
 from flask_sqlalchemy.pagination import Pagination
 from marshmallow import Schema
 from marshmallow.fields import Enum, Integer, Nested, String
-from sqlalchemy.exc import NoResultFound
+from sqlalchemy.exc import IntegrityError, NoResultFound
 
 from auth import auth
 from db import db
@@ -19,13 +21,19 @@ from ..use_cases import (
     DeleteFilteringPolicy,
     DeleteFilteringPolicyCommand,
 )
-from .rules import rules
-from .shemas import ListQueryArgSchema, strip_base_values
+from .exceptions import abort_already_exists, abort_not_found
+from .rules import (
+    FirewallRuleNetworkAddressSchema,
+    FirewallRulePortSchema,
+    rules,
+)
+from .shemas import PageSchema
+from .validations import not_just_whitespace
 
 filtering_policies = Blueprint(
     "filtering_policies",
     __name__,
-    url_prefix="/<int:firewall_id>/filtering-policies",
+    url_prefix="/<id:firewall_id>/filtering-policies",
     description="Filtering Policies API",
 )
 
@@ -43,11 +51,10 @@ class FilteringPolicyFirewallRuleSchema(Schema):
 
     action = Enum(FirewallAction)
 
-    source_address_pattern = String()
-    source_port = Integer()
+    sources = Nested(FirewallRuleNetworkAddressSchema, many=True)
+    destinations = Nested(FirewallRuleNetworkAddressSchema, many=True)
 
-    destination_address_pattern = String()
-    destination_port = Integer()
+    ports = Nested(FirewallRulePortSchema, many=True)
 
 
 class FilteringPolicySchema(Schema):
@@ -55,12 +62,12 @@ class FilteringPolicySchema(Schema):
     firewall = Nested(FilteringPolicyFirewallSchema, dump_only=True)
     rules = Nested(FilteringPolicyFirewallRuleSchema, dump_only=True, many=True)
 
-    name = String(required=True)
+    name = String(required=True, validate=not_just_whitespace())
 
     default_action = Enum(FirewallAction, required=True)
 
 
-class FilteringPolicyFilterSchema(ListQueryArgSchema):
+class FilteringPolicyFilterSchema(Schema):
     name = String()
     default_action = Enum(FirewallAction)
 
@@ -69,11 +76,13 @@ class FilteringPolicyFilterSchema(ListQueryArgSchema):
 class FilteringPolicies(MethodView):
     @auth.login_required
     @filtering_policies.arguments(FilteringPolicyFilterSchema, location="query")
-    @filtering_policies.response(200, FilteringPolicySchema(many=True))
+    @filtering_policies.response(200, PageSchema(FilteringPolicySchema))
+    @filtering_policies.paginate()
     def get(
         self,
         args: dict[str, Any],
         firewall_id: int,
+        pagination_parameters: PaginationParameters,
     ) -> Pagination:
         """
         Fetch a paginated list of `FilteringPolicy` records
@@ -82,16 +91,22 @@ class FilteringPolicies(MethodView):
 
         repository = NestedFilteringPolicyRepository(firewall_id, db)
 
-        return db.paginate(
-            repository.filter(**strip_base_values(args)),
-            page=args["page"],
-            per_page=args["per_page"],
+        page = db.paginate(
+            repository.filter(**args),
+            page=pagination_parameters.page,
+            per_page=pagination_parameters.page_size,
             max_per_page=settings.max_per_page,
         )
+
+        pagination_parameters.item_count = page.total
+
+        return page
 
     @auth.login_required
     @filtering_policies.arguments(FilteringPolicySchema)
     @filtering_policies.response(201, FilteringPolicySchema)
+    @filtering_policies.alt_response(404, schema=ErrorSchema)
+    @filtering_policies.alt_response(422, schema=ErrorSchema)
     def post(
         self,
         new_filtering_policy: dict[str, Any],
@@ -113,15 +128,18 @@ class FilteringPolicies(MethodView):
                 )
             )
         except NoResultFound:
-            abort(404)
+            abort_not_found("firewall", id=firewall_id)
+        except IntegrityError:
+            abort_already_exists("filtering-policy")
 
         return filtering_policy
 
 
-@filtering_policies.route("/<int:filtering_policy_id>/")
+@filtering_policies.route("/<id:filtering_policy_id>/")
 class FilteringPolicyById(MethodView):
     @auth.login_required
     @filtering_policies.response(200, FilteringPolicySchema)
+    @filtering_policies.alt_response(404, schema=ErrorSchema)
     def get(
         self, firewall_id: int, filtering_policy_id: int
     ) -> FilteringPolicy:
@@ -130,12 +148,18 @@ class FilteringPolicyById(MethodView):
         """
         repository = NestedFilteringPolicyRepository(firewall_id, db)
 
-        return db.one_or_404(
-            repository.select().where(FilteringPolicy.id == filtering_policy_id)
-        )
+        try:
+            return repository.get(filtering_policy_id)
+        except NoResultFound:
+            abort_not_found(
+                "filtering-policy",
+                id=filtering_policy_id,
+                firewall_id=firewall_id,
+            )
 
     @auth.login_required
     @filtering_policies.response(204, None)
+    @filtering_policies.alt_response(404, schema=ErrorSchema)
     def delete(
         self,
         firewall_id: int,
@@ -154,4 +178,8 @@ class FilteringPolicyById(MethodView):
                 DeleteFilteringPolicyCommand(filtering_policy_id)
             )
         except NoResultFound:
-            abort(404)
+            abort_not_found(
+                "filtering-policy",
+                id=filtering_policy_id,
+                firewall_id=firewall_id,
+            )

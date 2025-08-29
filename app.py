@@ -1,6 +1,7 @@
 from flask import Flask
 from flask_smorest import Api
 
+from converters import IdConverter, id_converter_params
 from db import db, migrate
 from firewalls import models  # noqa: F401 to register models with SQLAlchemy
 from firewalls.flask import firewalls
@@ -15,20 +16,20 @@ api = Api()
 settings = Settings()  # type: ignore[call-arg]
 
 
-def initialise_app(app_: Flask, settings_: Settings) -> None:
-    app_.config["SETTINGS"] = settings_
-    app_.config["SQLALCHEMY_DATABASE_URI"] = settings_.db_url
-    app_.config["TESTING"] = settings_.test
+def initialise_app(flask: Flask, settings_: Settings) -> None:
+    flask.config["SETTINGS"] = settings_
+    flask.config["SQLALCHEMY_DATABASE_URI"] = settings_.db_url
+    flask.config["TESTING"] = settings_.test
 
-    app_.config["API_TITLE"] = settings.app_name
-    app_.config["API_VERSION"] = settings.version
-    app_.config["OPENAPI_VERSION"] = "3.0.3"
-    app_.config["OPENAPI_URL_PREFIX"] = "/docs"
-    app_.config["OPENAPI_SWAGGER_UI_PATH"] = "/swagger-ui"
-    app_.config["OPENAPI_SWAGGER_UI_URL"] = (
+    flask.config["API_TITLE"] = settings.app_name
+    flask.config["API_VERSION"] = settings.version
+    flask.config["OPENAPI_VERSION"] = "3.0.3"
+    flask.config["OPENAPI_URL_PREFIX"] = "/docs"
+    flask.config["OPENAPI_SWAGGER_UI_PATH"] = "/swagger-ui"
+    flask.config["OPENAPI_SWAGGER_UI_URL"] = (
         "https://cdn.jsdelivr.net/npm/swagger-ui-dist@3.25.x/"
     )
-    app_.config["API_SPEC_OPTIONS"] = {
+    flask.config["API_SPEC_OPTIONS"] = {
         "security": [{"bearerAuth": []}],
         "components": {
             "securitySchemes": {
@@ -41,10 +42,13 @@ def initialise_app(app_: Flask, settings_: Settings) -> None:
         },
     }
 
-    db.init_app(app_)
-    migrate.init_app(app_, db)
+    db.init_app(flask)
+    migrate.init_app(flask, db)
 
-    api.init_app(app_)
+    api.init_app(flask)
+
+    flask.url_map.converters["id"] = IdConverter
+    api.register_converter(IdConverter, id_converter_params)
 
     api.register_blueprint(firewalls)
     api.register_blueprint(health)

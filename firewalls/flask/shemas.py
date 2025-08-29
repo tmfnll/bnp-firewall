@@ -1,18 +1,28 @@
-from typing import Any
+from typing import cast
 
 from marshmallow import Schema
-from marshmallow.fields import Integer, String
+from marshmallow.fields import Integer, Nested
 
 
-class ListQueryArgSchema(Schema):
-    page = Integer(load_default=1)
-    per_page = Integer(load_default=20)
-    sort_by = String(load_default="id")
+def page_schema(schema_type: type[Schema]) -> type[Schema]:
+    schema_prefix = schema_type.__name__
+
+    if schema_prefix.endswith("Schema"):
+        schema_prefix = schema_prefix[: -len("Schema")]
+
+    return cast(
+        type[Schema],
+        type(
+            f"{schema_prefix}PageSchema",
+            (Schema,),
+            {
+                "items": Nested(schema_type, many=True),
+                "total": Integer(),
+                "page": Integer(),
+                "per_page": Integer(),
+            },
+        ),
+    )
 
 
-def strip_base_values(args: dict[str, Any]) -> dict[str, Any]:
-    return {
-        key: value
-        for key, value in args.items()
-        if key not in ("page", "per_page", "sort_by")
-    }
+PageSchema = page_schema

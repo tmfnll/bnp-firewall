@@ -1,10 +1,16 @@
 from datetime import datetime, timezone
+from typing import Any, Callable
 
 import pytest
 from flask.testing import FlaskClient
 
 from conftest import DefaultHeaderFlaskClient
-from firewalls.models import FilteringPolicy, Firewall, FirewallRule
+from firewalls.models import (
+    FilteringPolicy,
+    Firewall,
+    FirewallAction,
+    FirewallRule,
+)
 from firewalls.tests.factories import (
     FilteringPolicyFactory,
     FirewallFactory,
@@ -39,7 +45,10 @@ def filtering_policy(
     firewall: Firewall, filtering_policy_deleted_at: datetime
 ) -> FilteringPolicy:
     return FilteringPolicyFactory.create(
-        rules=[], firewall=firewall, deleted_at=filtering_policy_deleted_at
+        rules=[],
+        firewall=firewall,
+        deleted_at=filtering_policy_deleted_at,
+        default_action=FirewallAction.ALLOW,
     )
 
 
@@ -82,7 +91,7 @@ class TestFirewalls:
         def test_it_returns_a_list_of_firewalls(
             self, firewall: Firewall, client: FlaskClient
         ) -> None:
-            response = client.get(f"/firewalls/?name={firewall.name}")
+            response = client.get("/firewalls/")
 
             assert response.status_code == 200
 
@@ -90,9 +99,47 @@ class TestFirewalls:
 
             assert data is not None
 
-            assert len(data) == 1
-            assert data[0]["id"] == firewall.id
-            assert data[0]["name"] == firewall.name
+            assert data["total"] == 1
+            assert data["page"] == 1
+            assert data["per_page"] == 10
+
+            items = data["items"]
+
+            assert len(items) == 1
+            assert items[0]["id"] == firewall.id
+            assert items[0]["name"] == firewall.name
+
+        @pytest.mark.parametrize(("filter",), (("name",),))
+        def test_filter_match(
+            self, filter: str, firewall: Firewall, client: FlaskClient
+        ) -> None:
+            response = client.get(
+                f"/firewalls/?{filter}={getattr(firewall, filter)}"
+            )
+
+            assert response.status_code == 200
+
+            assert response.json is not None
+
+            assert response.json["total"] == 1
+            assert response.json["items"][0]["id"] == firewall.id
+
+        @pytest.mark.parametrize(("filter", "value"), (("name", "xxx"),))
+        def test_filter_mismatch(
+            self,
+            filter: str,
+            value: str,
+            firewall: Firewall,
+            client: FlaskClient,
+        ) -> None:
+            response = client.get(f"/firewalls/?{filter}={value}")
+
+            assert response.status_code == 200
+
+            assert response.json is not None
+
+            assert response.json["total"] == 0
+            assert response.json["items"] == []
 
         def test_it_paginates_data(
             self,
@@ -100,15 +147,20 @@ class TestFirewalls:
             another_firewall: Firewall,
             client: FlaskClient,
         ) -> None:
-            response = client.get("/firewalls/?per_page=1&page=1")
+            response = client.get("/firewalls/?page_size=1&page=1")
 
             data = response.json
 
             assert data is not None
 
-            assert len(data) == 1
-            assert data[0]["id"] == firewall.id
-            assert data[0]["name"] == firewall.name
+            assert data["total"] == 2
+            assert data["page"] == 1
+            assert data["per_page"] == 1
+
+            (item,) = data["items"]
+
+            assert item["id"] == firewall.id
+            assert item["name"] == firewall.name
 
         class TestWhenTheFirewallIsSoftDeleted:
             @pytest.fixture
@@ -123,9 +175,20 @@ class TestFirewalls:
                 response = client.get(f"/firewalls/")
 
                 assert response.status_code == 200
-                assert response.json == []
+                assert response.json == {
+                    "items": [],
+                    "total": 0,
+                    "page": 1,
+                    "per_page": 10,
+                }
 
     class TestPost:
+        @pytest.fixture
+        def payload(self) -> dict[str, Any]:
+            return {
+                "name": "New Firewall",
+            }
+
         def test_an_unauthenticated_request_is_unauthorized(
             self, unauthenticated_client: DefaultHeaderFlaskClient
         ) -> None:
@@ -133,12 +196,12 @@ class TestFirewalls:
 
             assert response.status_code == 401
 
-        def test_it_creates_a_firewall(self, client: FlaskClient) -> None:
+        def test_it_creates_a_firewall(
+            self, client: FlaskClient, payload: dict[str, Any]
+        ) -> None:
             response = client.post(
                 "/firewalls/",
-                json={
-                    "name": "New Firewall",
-                },
+                json=payload,
             )
 
             assert response.status_code == 201
@@ -148,6 +211,45 @@ class TestFirewalls:
 
             assert "id" in data
             assert data["name"] == "New Firewall"
+
+        def test_a_422_is_returned_when_an_invalid_name_is_provided(
+            self,
+            client: FlaskClient,
+            payload: dict[str, Any],
+        ) -> None:
+            payload["name"] = "   "
+
+            response = client.post(f"/firewalls/", json=payload)
+
+            assert response.status_code == 422, response.json
+
+            assert response.json == {
+                "code": 422,
+                "status": "Unprocessable Entity",
+                "errors": {"json": {"name": ["Cannot be blank"]}},
+            }
+
+        def test_the_same_firewall_cannot_be_created_twice(
+            self, client: FlaskClient, payload: dict[str, Any]
+        ) -> None:
+            client.post(
+                "/firewalls/",
+                json=payload,
+            )
+
+            response = client.post(
+                "/firewalls/",
+                json=payload,
+            )
+
+            assert response.status_code == 422
+            data = response.json
+
+            assert data == {
+                "code": 422,
+                "status": "Unprocessable Entity",
+                "message": "A firewall with the same attributes already exists",
+            }
 
 
 class TestFirewallsById:
@@ -184,10 +286,23 @@ class TestFirewallsById:
                         {
                             "id": rule.id,
                             "action": rule.action.name,
-                            "source_address_pattern": rule.source_address_pattern,
-                            "source_port": rule.source_port,
-                            "destination_address_pattern": rule.destination_address_pattern,
-                            "destination_port": rule.destination_port,
+                            "sources": [
+                                {
+                                    "address": source.address,
+                                    "port": source.port,
+                                }
+                                for source in rule.sources
+                            ],
+                            "destinations": [
+                                {
+                                    "address": destination.address,
+                                    "port": destination.port,
+                                }
+                                for destination in rule.destinations
+                            ],
+                            "ports": [
+                                {"number": port.number} for port in rule.ports
+                            ],
                         }
                     ],
                 }
@@ -206,6 +321,11 @@ class TestFirewallsById:
                 response = client.get(f"/firewalls/{firewall.id}/")
 
                 assert response.status_code == 404
+                assert response.json == {
+                    "code": 404,
+                    "status": "Not Found",
+                    "message": f"A firewall with id={firewall.id} was not found",
+                }
 
         def test_when_no_firewall_exists_it_returns_404(
             self, client: FlaskClient
@@ -213,6 +333,11 @@ class TestFirewallsById:
             response = client.get("/firewalls/9999/")
 
             assert response.status_code == 404
+            assert response.json == {
+                "code": 404,
+                "status": "Not Found",
+                "message": "A firewall with id=9999 was not found",
+            }
 
     class TestDelete:
         def test_an_unauthenticated_request_is_unauthorized(
@@ -269,9 +394,66 @@ class TestFilteringPolicies:
 
             assert data is not None
 
-            assert len(data) == 1
-            assert data[0]["id"] == filtering_policy.id
-            assert data[0]["name"] == filtering_policy.name
+            assert data["total"] == 1
+            assert data["page"] == 1
+            assert data["per_page"] == 10
+
+            items = data["items"]
+
+            assert len(items) == 1
+            assert items[0]["id"] == filtering_policy.id
+            assert items[0]["name"] == filtering_policy.name
+
+        @pytest.mark.parametrize(
+            ("filter", "value"),
+            (
+                ("name", None),
+                ("default_action", "ALLOW"),
+            ),
+        )
+        def test_filter_match(
+            self,
+            filter: str,
+            value: str | None,
+            firewall: Firewall,
+            filtering_policy: FilteringPolicy,
+            client: FlaskClient,
+        ) -> None:
+
+            value = value or getattr(filtering_policy, filter)
+
+            response = client.get(
+                f"/firewalls/{firewall.id}/filtering-policies/?{filter}={value}"
+            )
+
+            assert response.status_code == 200
+
+            assert response.json is not None
+
+            assert response.json["total"] == 1
+            assert response.json["items"][0]["id"] == filtering_policy.id
+
+        @pytest.mark.parametrize(
+            ("filter", "value"), (("name", "xxx"), ("default_action", "DENY"))
+        )
+        def test_filter_mismatch(
+            self,
+            filter: str,
+            value: str,
+            firewall: Firewall,
+            filtering_policy: FilteringPolicy,
+            client: FlaskClient,
+        ) -> None:
+            response = client.get(
+                f"/firewalls/{firewall.id}/filtering-policies/?{filter}={value}"
+            )
+
+            assert response.status_code == 200
+
+            assert response.json is not None
+
+            assert response.json["total"] == 0
+            assert response.json["items"] == []
 
         def test_it_paginates_data(
             self,
@@ -281,16 +463,22 @@ class TestFilteringPolicies:
             client: FlaskClient,
         ) -> None:
             response = client.get(
-                f"/firewalls/{firewall.id}/filtering-policies/?per_page=1&page=1"
+                f"/firewalls/{firewall.id}/filtering-policies/?page_size=1&page=1"
             )
 
             data = response.json
 
             assert data is not None
 
-            assert len(data) == 1
-            assert data[0]["id"] == filtering_policy.id
-            assert data[0]["name"] == filtering_policy.name
+            assert data["total"] == 2
+            assert data["page"] == 1
+            assert data["per_page"] == 1
+
+            items = data["items"]
+
+            assert len(items) == 1
+            assert items[0]["id"] == filtering_policy.id
+            assert items[0]["name"] == filtering_policy.name
 
         class TestWhenTheFilteringPolicyIsSoftDeleted:
             @pytest.fixture
@@ -308,9 +496,19 @@ class TestFilteringPolicies:
                 )
 
                 assert response.status_code == 200
-                assert response.json == []
+
+                assert response.json is not None
+
+                assert response.json["items"] == []
 
     class TestPost:
+        @pytest.fixture
+        def payload(self) -> dict[str, Any]:
+            return {
+                "name": "New FilteringPolicy",
+                "default_action": "ALLOW",
+            }
+
         def test_an_unauthenticated_request_is_unauthorized(
             self, unauthenticated_client: DefaultHeaderFlaskClient
         ) -> None:
@@ -320,15 +518,21 @@ class TestFilteringPolicies:
 
             assert response.status_code == 401
 
+            assert response.json is not None
+
+            assert response.json == {
+                "code": 401,
+                "status": "Unauthorized",
+            }
+
         def test_it_creates_a_filtering_policy(
-            self, firewall: Firewall, client: FlaskClient
+            self,
+            firewall: Firewall,
+            client: FlaskClient,
+            payload: dict[str, Any],
         ) -> None:
             response = client.post(
-                f"/firewalls/{firewall.id}/filtering-policies/",
-                json={
-                    "name": "New FilteringPolicy",
-                    "default_action": "ALLOW",
-                },
+                f"/firewalls/{firewall.id}/filtering-policies/", json=payload
             )
 
             assert response.status_code == 201, response.json
@@ -338,6 +542,50 @@ class TestFilteringPolicies:
 
             assert "id" in data
             assert data["name"] == "New FilteringPolicy"
+
+        def test_a_422_is_returned_when_an_invalid_name_is_provided(
+            self,
+            firewall: Firewall,
+            client: FlaskClient,
+            payload: dict[str, Any],
+        ) -> None:
+            payload["name"] = "   "
+
+            response = client.post(
+                f"/firewalls/{firewall.id}/filtering-policies/", json=payload
+            )
+
+            assert response.status_code == 422, response.json
+
+            assert response.json == {
+                "code": 422,
+                "status": "Unprocessable Entity",
+                "errors": {"json": {"name": ["Cannot be blank"]}},
+            }
+
+        def test_two_filtering_policies_with_the_same_name_cannot_be_created(
+            self,
+            firewall: Firewall,
+            client: FlaskClient,
+            payload: dict[str, Any],
+        ) -> None:
+            client.post(
+                f"/firewalls/{firewall.id}/filtering-policies/",
+                json=payload,
+            )
+
+            response = client.post(
+                f"/firewalls/{firewall.id}/filtering-policies/",
+                json=payload,
+            )
+
+            assert response.status_code == 422, response.json
+
+            assert response.json == {
+                "code": 422,
+                "status": "Unprocessable Entity",
+                "message": "A filtering-policy with the same attributes already exists",
+            }
 
         def test_the_parent_firewall_does_not_exist_it_returns_404(
             self, firewall: Firewall, client: FlaskClient
@@ -351,6 +599,12 @@ class TestFilteringPolicies:
             )
 
             assert response.status_code == 404, response.json
+
+            assert response.json == {
+                "code": 404,
+                "status": "Not Found",
+                "message": "A firewall with id=123 was not found",
+            }
 
 
 class TestFilteringPoliciesById:
@@ -389,10 +643,21 @@ class TestFilteringPoliciesById:
                 {
                     "id": rule.id,
                     "action": rule.action.name,
-                    "source_address_pattern": rule.source_address_pattern,
-                    "source_port": rule.source_port,
-                    "destination_address_pattern": rule.destination_address_pattern,
-                    "destination_port": rule.destination_port,
+                    "sources": [
+                        {
+                            "address": source.address,
+                            "port": source.port,
+                        }
+                        for source in rule.sources
+                    ],
+                    "destinations": [
+                        {
+                            "address": destination.address,
+                            "port": destination.port,
+                        }
+                        for destination in rule.destinations
+                    ],
+                    "ports": [{"number": port.number} for port in rule.ports],
                 }
             ]
 
@@ -412,6 +677,11 @@ class TestFilteringPoliciesById:
                 )
 
                 assert response.status_code == 404
+                assert response.json == {
+                    "code": 404,
+                    "status": "Not Found",
+                    "message": f"A filtering-policy with id={filtering_policy.id} and firewall_id={firewall.id} was not found",
+                }
 
         def test_when_no_filtering_policy_exists_it_returns_404(
             self, firewall: Firewall, client: FlaskClient
@@ -421,6 +691,11 @@ class TestFilteringPoliciesById:
             )
 
             assert response.status_code == 404
+            assert response.json == {
+                "code": 404,
+                "status": "Not Found",
+                "message": f"A filtering-policy with id=9999 and firewall_id={firewall.id} was not found",
+            }
 
     class TestDelete:
         def test_an_unauthenticated_request_is_unauthorized(
@@ -473,7 +748,7 @@ class TestFirewallRules:
 
             assert response.status_code == 401
 
-        def test_it_returns_a_list_of_filtering_policies(
+        def test_it_returns_a_list_of_firewall_rules(
             self,
             firewall: Firewall,
             filtering_policy: FilteringPolicy,
@@ -481,26 +756,117 @@ class TestFirewallRules:
             client: FlaskClient,
         ) -> None:
             response = client.get(
-                f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id}/rules/?source_port={rule.source_port}"
+                f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id}/rules/?source_port={rule.sources[0].port}"
             )
 
             assert response.status_code == 200
 
             assert response.json is not None
 
-            (datum,) = response.json
+            (datum,) = response.json["items"]
 
-            assert datum["id"] == rule.id
-            assert datum["action"] == rule.action.name
-            assert (
-                datum["source_address_pattern"] == rule.source_address_pattern
+            assert datum == {
+                "id": rule.id,
+                "filtering_policy": {
+                    "id": filtering_policy.id,
+                    "name": filtering_policy.name,
+                    "default_action": filtering_policy.default_action.name,
+                    "firewall": {
+                        "id": firewall.id,
+                        "name": firewall.name,
+                    },
+                },
+                "action": rule.action.name,
+                "sources": [
+                    {
+                        "address": source.address,
+                        "port": source.port,
+                    }
+                    for source in rule.sources
+                ],
+                "destinations": [
+                    {
+                        "address": destination.address,
+                        "port": destination.port,
+                    }
+                    for destination in rule.destinations
+                ],
+                "ports": [{"number": port.number} for port in rule.ports],
+            }
+
+        @pytest.mark.parametrize(
+            ("filter", "value"),
+            (
+                ("action", lambda r: r.action.name),
+                ("source_address", lambda r: r.sources[0].address),
+                ("source_port", lambda r: r.sources[0].port),
+                ("destination_address", lambda r: r.destinations[0].address),
+                ("destination_port", lambda r: r.destinations[0].port),
+                ("port", lambda r: r.ports[0].number),
+            ),
+        )
+        def test_filter_match(
+            self,
+            filter: str,
+            value: Callable[[FirewallRule], str],
+            firewall: Firewall,
+            filtering_policy: FilteringPolicy,
+            rule: FirewallRule,
+            client: FlaskClient,
+        ) -> None:
+            value_str = value(rule)
+
+            response = client.get(
+                f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id}/rules/?{filter}={value_str}"
             )
-            assert datum["source_port"] == rule.source_port
-            assert (
-                datum["destination_address_pattern"]
-                == rule.destination_address_pattern
+
+            assert response.status_code == 200
+
+            assert response.json is not None
+
+            assert response.json["total"] == 1
+            assert response.json["items"][0]["id"] == rule.id
+
+        @pytest.mark.parametrize(
+            ("filter", "value"),
+            (
+                (
+                    "action",
+                    lambda r: (
+                        "DENY" if r.action is FirewallAction.ALLOW else "ALLOW"
+                    ),
+                ),
+                ("source_address", lambda r: r.sources[0].address + "/32"),
+                ("source_port", lambda r: r.sources[0].port + 1),
+                (
+                    "destination_address",
+                    lambda r: r.destinations[0].address + "/32",
+                ),
+                ("destination_port", lambda r: r.destinations[0].port + 1),
+                ("port", lambda r: r.ports[0].number + 1),
+            ),
+        )
+        def test_filter_mismatch(
+            self,
+            filter: str,
+            value: Callable[[FirewallRule], str],
+            firewall: Firewall,
+            filtering_policy: FilteringPolicy,
+            rule: FirewallRule,
+            client: FlaskClient,
+        ) -> None:
+            value_str = value(rule)
+
+            response = client.get(
+                f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id}/rules/?{filter}={value_str}"
             )
-            assert datum["destination_port"] == rule.destination_port
+
+            assert response.status_code == 200
+
+            assert response.json is not None
+
+            assert response.json["total"] == 0
+            assert response.json["items"] == []
 
         def test_it_paginates_data(
             self,
@@ -511,24 +877,47 @@ class TestFirewallRules:
             client: FlaskClient,
         ) -> None:
             response = client.get(
-                f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id}/rules/?per_page=1&page=1"
+                f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id}/rules/?page_size=1&page=1"
             )
 
             assert response.json is not None
 
-            (datum,) = response.json
+            data = response.json
 
-            assert datum["id"] == rule.id
-            assert datum["action"] == rule.action.name
-            assert (
-                datum["source_address_pattern"] == rule.source_address_pattern
-            )
-            assert datum["source_port"] == rule.source_port
-            assert (
-                datum["destination_address_pattern"]
-                == rule.destination_address_pattern
-            )
-            assert datum["destination_port"] == rule.destination_port
+            assert data["total"] == 2
+            assert data["page"] == 1
+            assert data["per_page"] == 1
+
+            (datum,) = data["items"]
+
+            assert datum == {
+                "id": rule.id,
+                "filtering_policy": {
+                    "id": filtering_policy.id,
+                    "name": filtering_policy.name,
+                    "default_action": filtering_policy.default_action.name,
+                    "firewall": {
+                        "id": firewall.id,
+                        "name": firewall.name,
+                    },
+                },
+                "action": rule.action.name,
+                "sources": [
+                    {
+                        "address": source.address,
+                        "port": source.port,
+                    }
+                    for source in rule.sources
+                ],
+                "destinations": [
+                    {
+                        "address": destination.address,
+                        "port": destination.port,
+                    }
+                    for destination in rule.destinations
+                ],
+                "ports": [{"number": port.number} for port in rule.ports],
+            }
 
         class TestWhenTheFirewallRuleIsSoftDeleted:
             @pytest.fixture
@@ -547,7 +936,10 @@ class TestFirewallRules:
                 )
 
                 assert response.status_code == 200
-                assert response.json == []
+
+                assert response.json is not None
+
+                assert response.json["items"] == []
 
     class TestPost:
         def test_an_unauthenticated_request_is_unauthorized(
@@ -559,21 +951,29 @@ class TestFirewallRules:
 
             assert response.status_code == 401
 
+        @pytest.fixture
+        def payload(self) -> dict[str, Any]:
+            return {
+                "sources": [
+                    {"address": "100.100.100.0/24", "port": 8080},
+                ],
+                "destinations": [
+                    {"address": "200.200.200.200", "port": 9090},
+                ],
+                "ports": [{"number": 8080}],
+                "action": "ALLOW",
+            }
+
         def test_it_creates_a_rule(
             self,
             firewall: Firewall,
             filtering_policy: FilteringPolicy,
             client: FlaskClient,
+            payload: dict[str, Any],
         ) -> None:
             response = client.post(
                 f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id}/rules/",
-                json={
-                    "source_address_pattern": "100.100.100.100",
-                    "destination_address_pattern": "200.200.200.200",
-                    "source_port": "8080",
-                    "destination_port": "9090",
-                    "action": "ALLOW",
-                },
+                json=payload,
             )
 
             assert response.status_code == 201, response.json
@@ -582,11 +982,157 @@ class TestFirewallRules:
             assert data is not None
 
             assert "id" in data
-            assert data["source_address_pattern"] == "100.100.100.100"
-            assert data["destination_address_pattern"] == "200.200.200.200"
-            assert data["source_port"] == 8080
-            assert data["destination_port"] == 9090
+            assert data["sources"] == [
+                {"address": "100.100.100.0/24", "port": 8080}
+            ]
+            assert data["destinations"] == [
+                {"address": "200.200.200.200", "port": 9090}
+            ]
+            assert data["ports"] == [{"number": 8080}]
             assert data["action"] == "ALLOW"
+
+        def test_the_same_rule_cannot_be_added_twice(
+            self,
+            firewall: Firewall,
+            filtering_policy: FilteringPolicy,
+            client: FlaskClient,
+            payload: dict[str, Any],
+        ) -> None:
+            client.post(
+                f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id}/rules/",
+                json=payload,
+            )
+
+            response = client.post(
+                f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id}/rules/",
+                json=payload,
+            )
+
+            assert response.status_code == 422, response.json
+            assert response.json == {
+                "code": 422,
+                "status": "Unprocessable Entity",
+                "message": "A rule with the same attributes already exists",
+            }
+
+        def test_a_422_is_returned_when_an_invalid_address_is_provided(
+            self,
+            firewall: Firewall,
+            filtering_policy: FilteringPolicy,
+            client: FlaskClient,
+            payload: dict[str, Any],
+        ) -> None:
+            payload["sources"][0]["address"] = "999.999.999.999"
+
+            response = client.post(
+                f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id}/rules/",
+                json=payload,
+            )
+
+            assert response.status_code == 422, response.json
+            assert response.json == {
+                "code": 422,
+                "status": "Unprocessable Entity",
+                "errors": {
+                    "json": {
+                        "sources": {
+                            "0": {
+                                "address": [
+                                    "999.999.999.999 is not a valid IP address or subnet CIDR"
+                                ]
+                            }
+                        }
+                    }
+                },
+            }
+
+        def test_a_422_is_returned_when_an_invalid_source_port_provided(
+            self,
+            firewall: Firewall,
+            filtering_policy: FilteringPolicy,
+            client: FlaskClient,
+            payload: dict[str, Any],
+        ) -> None:
+            payload["sources"][0]["port"] = -1
+
+            response = client.post(
+                f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id}/rules/",
+                json=payload,
+            )
+
+            assert response.status_code == 422, response.json
+            assert response.json == {
+                "code": 422,
+                "status": "Unprocessable Entity",
+                "errors": {
+                    "json": {
+                        "sources": {
+                            "0": {"port": ["-1 is not a valid TCP port number"]}
+                        }
+                    }
+                },
+            }
+
+        @pytest.mark.parametrize(
+            ("relation",),
+            (
+                ("sources",),
+                ("destinations",),
+                ("ports",),
+            ),
+        )
+        def test_a_422_is_returned_when_no_related_data_are_provided(
+            self,
+            relation: str,
+            firewall: Firewall,
+            filtering_policy: FilteringPolicy,
+            client: FlaskClient,
+            payload: dict[str, Any],
+        ) -> None:
+            payload[relation] = []
+
+            response = client.post(
+                f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id}/rules/",
+                json=payload,
+            )
+
+            assert response.status_code == 422, response.json
+            assert response.json == {
+                "code": 422,
+                "status": "Unprocessable Entity",
+                "errors": {
+                    "json": {relation: ["Shorter than minimum length 1."]}
+                },
+            }
+
+        def test_a_422_is_returned_when_an_invalid_port_provided(
+            self,
+            firewall: Firewall,
+            filtering_policy: FilteringPolicy,
+            client: FlaskClient,
+            payload: dict[str, Any],
+        ) -> None:
+            payload["ports"][0]["number"] = -1
+
+            response = client.post(
+                f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id}/rules/",
+                json=payload,
+            )
+
+            assert response.status_code == 422, response.json
+            assert response.json == {
+                "code": 422,
+                "status": "Unprocessable Entity",
+                "errors": {
+                    "json": {
+                        "ports": {
+                            "0": {
+                                "number": ["-1 is not a valid TCP port number"]
+                            }
+                        }
+                    }
+                },
+            }
 
         def test_the_parent_firewall_does_not_exist_it_returns_404(
             self,
@@ -597,15 +1143,23 @@ class TestFirewallRules:
             response = client.post(
                 f"/firewalls/{firewall.id + 1}/filtering-policies/{filtering_policy.id}/rules/",
                 json={
-                    "source_address_pattern": "100.100.100.100",
-                    "destination_address_pattern": "200.200.200.200",
-                    "source_port": "8080",
-                    "destination_port": "9090",
+                    "sources": [
+                        {"address": "100.100.100.0/24", "port": 8080},
+                    ],
+                    "destinations": [
+                        {"address": "200.200.200.200", "port": 9090},
+                    ],
+                    "ports": [{"number": 8080}],
                     "action": "ALLOW",
                 },
             )
 
             assert response.status_code == 404, response.json
+            assert response.json == {
+                "code": 404,
+                "status": "Not Found",
+                "message": f"A filtering-policy with id={filtering_policy.id} and firewall_id={firewall.id + 1} was not found",
+            }
 
         def test_the_parent_filtering_policy_does_not_exist_it_returns_404(
             self,
@@ -616,15 +1170,23 @@ class TestFirewallRules:
             response = client.post(
                 f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id + 1}/rules/",
                 json={
-                    "source_address_pattern": "100.100.100.100",
-                    "destination_address_pattern": "200.200.200.200",
-                    "source_port": "8080",
-                    "destination_port": "9090",
+                    "sources": [
+                        {"address": "100.100.100.0/24", "port": 8080},
+                    ],
+                    "destinations": [
+                        {"address": "200.200.200.200", "port": 9090},
+                    ],
+                    "ports": [{"number": 8080}],
                     "action": "ALLOW",
                 },
             )
 
             assert response.status_code == 404, response.json
+            assert response.json == {
+                "code": 404,
+                "status": "Not Found",
+                "message": f"A filtering-policy with id={filtering_policy.id + 1} and firewall_id={firewall.id} was not found",
+            }
 
 
 class TestFirewallRulesById:
@@ -654,23 +1216,33 @@ class TestFirewallRulesById:
 
             assert data is not None
 
-            assert data["id"] == rule.id
-            assert data["action"] == rule.action.name
-            assert data["source_address_pattern"] == rule.source_address_pattern
-            assert data["source_port"] == rule.source_port
-            assert (
-                data["destination_address_pattern"]
-                == rule.destination_address_pattern
-            )
-            assert data["destination_port"] == rule.destination_port
-            assert data["filtering_policy"] == {
-                "id": filtering_policy.id,
-                "name": filtering_policy.name,
-                "default_action": filtering_policy.default_action.name,
-                "firewall": {
-                    "id": firewall.id,
-                    "name": firewall.name,
+            assert data == {
+                "id": rule.id,
+                "filtering_policy": {
+                    "id": filtering_policy.id,
+                    "name": filtering_policy.name,
+                    "default_action": filtering_policy.default_action.name,
+                    "firewall": {
+                        "id": firewall.id,
+                        "name": firewall.name,
+                    },
                 },
+                "action": rule.action.name,
+                "sources": [
+                    {
+                        "address": source.address,
+                        "port": source.port,
+                    }
+                    for source in rule.sources
+                ],
+                "destinations": [
+                    {
+                        "address": destination.address,
+                        "port": destination.port,
+                    }
+                    for destination in rule.destinations
+                ],
+                "ports": [{"number": port.number} for port in rule.ports],
             }
 
         class TestWhenTheFirewallRuleIsSoftDeleted:
@@ -702,6 +1274,12 @@ class TestFirewallRulesById:
             )
 
             assert response.status_code == 404
+
+            assert response.json == {
+                "code": 404,
+                "status": "Not Found",
+                "message": f"A rule with id=9999 and filtering_policy_id={filtering_policy.id} and firewall_id={firewall.id} was not found",
+            }
 
     class TestDelete:
         def test_an_unauthenticated_request_is_unauthorized(
@@ -743,3 +1321,9 @@ class TestFirewallRulesById:
             )
 
             assert response.status_code == 404
+
+            assert response.json == {
+                "code": 404,
+                "status": "Not Found",
+                "message": f"A rule with id=9999 and filtering_policy_id={filtering_policy.id} and firewall_id={firewall.id} was not found",
+            }
