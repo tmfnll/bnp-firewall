@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError, NoResultFound
 from auth import auth
 from db import db
 from firewalls.flask.exceptions import abort_already_exists, abort_not_found
+from firewalls.flask.links import links, operation
 from firewalls.flask.shemas import BaseSchema, PageSchema
 from firewalls.flask.validations import (
     IsValidIPAddressOrSubnetCIDR,
@@ -133,6 +134,29 @@ class FirewallRules(MethodView):
         return page
 
     @auth.login_required
+    @links(
+        rules,
+        201,
+        "getCreatedRule",
+        "getRuleById",
+        {
+            "rule_id": ("id",),
+            "filtering_policy_id": ("filtering_policy", "id"),
+            "firewall_id": ("filtering_policy", "firewall", "id"),
+        },
+    )
+    @links(
+        rules,
+        201,
+        "deleteCreatedRule",
+        "deleteRuleById",
+        {
+            "rule_id": ("id",),
+            "filtering_policy_id": ("filtering_policy", "id"),
+            "firewall_id": ("filtering_policy", "firewall", "id"),
+        },
+    )
+    @operation(rules, "createRule")
     @rules.arguments(FirewallRuleSchema)
     @rules.response(201, FirewallRuleSchema)
     @rules.alt_response(404, schema=ErrorSchema)
@@ -186,6 +210,7 @@ class FirewallRuleById(MethodView):
     @auth.login_required
     @rules.response(200, FirewallRuleSchema)
     @rules.alt_response(404, schema=ErrorSchema)
+    @operation(rules, "getRuleById")
     def get(
         self, firewall_id: int, filtering_policy_id: int, rule_id: int
     ) -> FirewallRule:
@@ -209,6 +234,7 @@ class FirewallRuleById(MethodView):
     @auth.login_required
     @rules.response(204, None)
     @rules.alt_response(404, schema=ErrorSchema)
+    @operation(rules, "deleteRuleById")
     def delete(
         self,
         firewall_id: int,

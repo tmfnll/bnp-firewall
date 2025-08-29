@@ -25,6 +25,7 @@ from .exceptions import (
     abort_already_exists,
     abort_not_found,
 )
+from .links import links, operation
 from .rules import FirewallRuleNetworkAddressSchema, FirewallRulePortSchema
 from .shemas import BaseSchema, PageSchema
 from .validations import not_just_whitespace
@@ -100,10 +101,25 @@ class Firewalls(MethodView):
         return page
 
     @auth.login_required
+    @links(
+        firewalls,
+        201,
+        "getCreatedFirewall",
+        "getFirewallById",
+        {"firewall_id": ("id",)},
+    )
+    @links(
+        firewalls,
+        201,
+        "deleteCreatedFirewall",
+        "deleteFirewallById",
+        {"firewall_id": ("id",)},
+    )
+    @operation(firewalls, "createFirewall")
     @firewalls.arguments(FirewallSchema)
     @firewalls.response(201, FirewallSchema)
     @firewalls.alt_response(404, schema=ErrorSchema)
-    @firewalls.alt_response(409, schema=ErrorSchema)
+    @firewalls.alt_response(422, schema=ErrorSchema)
     def post(
         self,
         new_firewall: dict[str, Any],
@@ -124,6 +140,7 @@ class FirewallById(MethodView):
     @auth.login_required
     @firewalls.response(200, FirewallSchema)
     @firewalls.alt_response(404, schema=ErrorSchema)
+    @operation(firewalls, "getFirewallById")
     def get(self, firewall_id: int) -> Firewall:
         """
         Fetch a single `Firewall` record by its ID
@@ -138,6 +155,7 @@ class FirewallById(MethodView):
     @auth.login_required
     @firewalls.response(204, None)
     @firewalls.alt_response(404, schema=ErrorSchema)
+    @operation(firewalls, "deleteFirewallById")
     def delete(
         self,
         firewall_id: int,
