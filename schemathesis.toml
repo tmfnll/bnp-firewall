@@ -1,0 +1,4 @@
+headers = { Authorization = "Bearer test" }
+
+[phases]
+stateful.generation.max-examples = 20
