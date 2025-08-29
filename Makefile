@@ -83,6 +83,14 @@ ci: .env lint mypy_all check_migrations test_all ## Run all check that would be 
 local_run: .env migrate ##  Run the app locally
 	flask run --debug --port 8080
 
+.PHONY: recreate_db
+recreate_db:  ## Recreate the database
+	flask shell <<< 'from db import db; db.drop_all(); db.create_all()'
+
+.PHONY: schemathesis
+schemathesis:  recreate_db  ## Use schemathesis to test the API
+	schemathesis run http://127.0.0.1:8080/docs/openapi.json --generation-unique-inputs --output-sanitize false
+
 .PHONY: help
 help: ## Display this help text
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'

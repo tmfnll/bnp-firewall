@@ -1,0 +1,4 @@
+headers = { Authorization = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InRlc3QiLCJyb2xlcyI6WyJhZG1pbiIsInZpZXdlciIsImVkaXRvciIsImhlYWx0aF9jaGVjayJdLCJleHAiOjE3NTkyNTIzMDIuOTk4NjE0fQ.UrngUKjZtiREvMZB4AUwvsYSOkiiQvxPW9TO8hmWqAw" }
+
+[phases]
+stateful.generation.max-examples = 50
