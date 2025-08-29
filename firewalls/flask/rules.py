@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError, NoResultFound
 from auth import auth
 from db import db
 from firewalls.flask.exceptions import abort_already_exists, abort_not_found
-from firewalls.flask.shemas import PageSchema
+from firewalls.flask.shemas import BaseSchema, PageSchema
 from firewalls.flask.validations import (
     IsValidIPAddressOrSubnetCIDR,
     is_valid_tcp_port,
@@ -44,12 +44,12 @@ rules = Blueprint(
 )
 
 
-class FirewallRuleFirewallSchema(Schema):
+class FirewallRuleFirewallSchema(BaseSchema):
     id = Integer()
     name = String()
 
 
-class FirewallRuleFilteringPolicySchema(Schema):
+class FirewallRuleFilteringPolicySchema(BaseSchema):
     id = Integer()
     name = String()
     default_action = Enum(FirewallAction)
@@ -57,16 +57,16 @@ class FirewallRuleFilteringPolicySchema(Schema):
     firewall = Nested(FirewallRuleFirewallSchema)
 
 
-class FirewallRuleNetworkAddressSchema(Schema):
+class FirewallRuleNetworkAddressSchema(BaseSchema):
     address = String(validate=IsValidIPAddressOrSubnetCIDR(), required=True)
     port = Integer(validate=is_valid_tcp_port(), required=True)
 
 
-class FirewallRulePortSchema(Schema):
+class FirewallRulePortSchema(BaseSchema):
     number = Integer(validate=is_valid_tcp_port(), required=True)
 
 
-class FirewallRuleSchema(Schema):
+class FirewallRuleSchema(BaseSchema):
     id = Integer(dump_only=True)
     action = Enum(FirewallAction, required=True)
 

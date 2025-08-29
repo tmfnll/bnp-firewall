@@ -4,6 +4,12 @@ from marshmallow import Schema
 from marshmallow.fields import Integer, Nested
 
 
+class BaseSchema(Schema):
+    class Meta:
+        ordered = True
+        unknown = "exclude"  # This allows the API to be forward compatible
+
+
 def page_schema(schema_type: type[Schema]) -> type[Schema]:
     schema_prefix = schema_type.__name__
 
