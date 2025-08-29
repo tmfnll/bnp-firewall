@@ -36,7 +36,7 @@ def initialise_app(flask: Flask, settings_: Settings) -> None:
                 "bearerAuth": {
                     "type": "http",
                     "scheme": "bearer",
-                    "bearerFormat": "JWT",
+                    "bearerFormat": "TEXT",
                 }
             }
         },
