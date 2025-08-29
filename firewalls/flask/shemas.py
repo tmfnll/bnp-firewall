@@ -1,7 +1,12 @@
-from typing import cast
+from typing import Any, cast
 
 from marshmallow import Schema
-from marshmallow.fields import Integer, Nested
+from marshmallow.fields import Integer, Nested, String
+
+from firewalls.flask.validations import (
+    IsValidIPAddressOrSubnetCIDR,
+    is_valid_tcp_port,
+)
 
 
 class BaseSchema(Schema):
@@ -32,3 +37,53 @@ def page_schema(schema_type: type[Schema]) -> type[Schema]:
 
 
 PageSchema = page_schema
+
+
+def ip_or_subnet_cidr_field(
+    *args: Any,
+    example: str | None = "92.168.1.0/24",
+    description: str | None = "An IP address or a subnet in CIDR notation",
+    **kwargs: Any,
+) -> String:
+    metadata: dict[str, Any] = {}
+
+    if example is not None:
+        metadata["example"] = example
+
+    if description is not None:
+        metadata["description"] = description
+
+    return String(
+        *args,
+        validate=IsValidIPAddressOrSubnetCIDR(),
+        metadata=metadata,
+        **kwargs,
+    )
+
+
+IpOrSubnetCidrField = ip_or_subnet_cidr_field
+
+
+def port_field(
+    *args: Any,
+    example: int | None = 443,
+    description: str | None = "A TCP port number between 0 and 65535",
+    **kwargs: Any,
+) -> Integer:
+    metadata: dict[str, Any] = {}
+
+    if example is not None:
+        metadata["example"] = example
+
+    if description is not None:
+        metadata["description"] = description
+
+    return Integer(
+        *args,
+        validate=is_valid_tcp_port(),
+        metadata=metadata,
+        **kwargs,
+    )
+
+
+PortField = port_field
