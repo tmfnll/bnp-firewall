@@ -12,24 +12,27 @@ from sqlalchemy.exc import IntegrityError, NoResultFound
 
 from auth import auth
 from db import db
-
-from ..models import FilteringPolicy, FirewallAction
-from ..repositories import FirewallRepository, NestedFilteringPolicyRepository
-from ..use_cases import (
+from firewalls.flask.exceptions import abort_already_exists, abort_not_found
+from firewalls.flask.links import links, operation
+from firewalls.flask.shemas import BaseSchema, PageSchema
+from firewalls.flask.validations import not_just_whitespace
+from firewalls.models import FilteringPolicy, FirewallAction
+from firewalls.repositories import (
+    FirewallRepository,
+    NestedFilteringPolicyRepository,
+)
+from firewalls.use_cases import (
     CreateFilteringPolicy,
     CreateFilteringPolicyCommand,
     DeleteFilteringPolicy,
     DeleteFilteringPolicyCommand,
 )
-from .exceptions import abort_already_exists, abort_not_found
-from .links import links, operation
+
 from .rules import (
     FirewallRuleNetworkAddressSchema,
     FirewallRulePortSchema,
     rules,
 )
-from .shemas import BaseSchema, PageSchema
-from .validations import not_just_whitespace
 
 filtering_policies = Blueprint(
     "filtering_policies",

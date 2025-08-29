@@ -12,23 +12,23 @@ from sqlalchemy.exc import IntegrityError, NoResultFound
 
 from auth import auth
 from db import db
-
-from ..models import Firewall, FirewallAction
-from ..repositories import FirewallRepository
-from ..use_cases import (
+from firewalls.flask.exceptions import (
+    abort_already_exists,
+    abort_not_found,
+)
+from firewalls.flask.links import links, operation
+from firewalls.flask.shemas import BaseSchema, PageSchema
+from firewalls.flask.validations import not_just_whitespace
+from firewalls.models import Firewall, FirewallAction
+from firewalls.repositories import FirewallRepository
+from firewalls.use_cases import (
     CreateFirewall,
     CreateFirewallCommand,
     DeleteFirewall,
     DeleteFirewallCommand,
 )
-from .exceptions import (
-    abort_already_exists,
-    abort_not_found,
-)
-from .links import links, operation
+
 from .rules import FirewallRuleNetworkAddressSchema, FirewallRulePortSchema
-from .shemas import BaseSchema, PageSchema
-from .validations import not_just_whitespace
 
 firewalls = Blueprint(
     "firewalls", __name__, url_prefix="/firewalls", description="Firewalls API"

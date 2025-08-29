@@ -4,7 +4,7 @@ from flask_smorest import Api
 from converters import IdConverter, id_converter_params
 from db import db, migrate
 from firewalls import models  # noqa: F401 to register models with SQLAlchemy
-from firewalls.flask import firewalls
+from firewalls.flask.views import firewalls
 from health import health
 from settings import Settings
 
