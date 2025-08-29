@@ -22,6 +22,7 @@ from ..use_cases import (
     DeleteFilteringPolicyCommand,
 )
 from .exceptions import abort_already_exists, abort_not_found
+from .links import links, operation
 from .rules import (
     FirewallRuleNetworkAddressSchema,
     FirewallRulePortSchema,
@@ -103,6 +104,27 @@ class FilteringPolicies(MethodView):
         return page
 
     @auth.login_required
+    @links(
+        filtering_policies,
+        201,
+        "getCreatedFilteringPolicy",
+        "getFilteringPolicyById",
+        {
+            "filtering_policy_id": ("id",),
+            "firewall_id": ("firewall", "id"),
+        },
+    )
+    @links(
+        filtering_policies,
+        201,
+        "deleteCreatedFilteringPolicy",
+        "deleteFilteringPolicyById",
+        {
+            "filtering_policy_id": ("id",),
+            "firewall_id": ("firewall", "id"),
+        },
+    )
+    @operation(filtering_policies, "createFilteringPolicy")
     @filtering_policies.arguments(FilteringPolicySchema)
     @filtering_policies.response(201, FilteringPolicySchema)
     @filtering_policies.alt_response(404, schema=ErrorSchema)
@@ -140,6 +162,7 @@ class FilteringPolicyById(MethodView):
     @auth.login_required
     @filtering_policies.response(200, FilteringPolicySchema)
     @filtering_policies.alt_response(404, schema=ErrorSchema)
+    @operation(filtering_policies, "getFilteringPolicyById")
     def get(
         self, firewall_id: int, filtering_policy_id: int
     ) -> FilteringPolicy:
@@ -160,6 +183,7 @@ class FilteringPolicyById(MethodView):
     @auth.login_required
     @filtering_policies.response(204, None)
     @filtering_policies.alt_response(404, schema=ErrorSchema)
+    @operation(filtering_policies, "deleteFilteringPolicyById")
     def delete(
         self,
         firewall_id: int,
