@@ -1,5 +1,6 @@
 from flask import current_app
 from flask_httpauth import HTTPTokenAuth
+from webargs.flaskparser import abort
 
 auth = HTTPTokenAuth()
 
@@ -12,3 +13,8 @@ def verify_token(token: str) -> bool | None:
         return True
 
     return None
+
+
+@auth.error_handler
+def auth_error(status):
+    abort(status)

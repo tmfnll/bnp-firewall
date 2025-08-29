@@ -1,16 +1,24 @@
 from typing import Any
 
-from flask import abort, current_app
+from flask import current_app
 from flask.views import MethodView
 from flask_smorest import Blueprint
+from flask_smorest.error_handler import ErrorSchema
+from flask_smorest.pagination import PaginationParameters
 from flask_sqlalchemy.pagination import Pagination
 from marshmallow import Schema
 from marshmallow.fields import Enum, Integer, Nested, String
-from sqlalchemy.exc import NoResultFound
+from marshmallow.validate import Length
+from sqlalchemy.exc import IntegrityError, NoResultFound
 
 from auth import auth
 from db import db
-from firewalls.flask.shemas import ListQueryArgSchema, strip_base_values
+from firewalls.flask.exceptions import abort_already_exists, abort_not_found
+from firewalls.flask.shemas import PageSchema
+from firewalls.flask.validations import (
+    IsValidIPAddressOrSubnetCIDR,
+    is_valid_tcp_port,
+)
 from firewalls.models import (
     FirewallAction,
     FirewallRule,
@@ -22,6 +30,8 @@ from firewalls.repositories import (
 from firewalls.use_cases import (
     CreateFirewallRule,
     CreateFirewallRuleCommand,
+    CreateFirewallRuleNetworkAddressCommand,
+    CreateFirewallRulePortCommand,
     DeleteFirewallRule,
     DeleteFirewallRuleCommand,
 )
@@ -29,7 +39,7 @@ from firewalls.use_cases import (
 rules = Blueprint(
     "rules",
     __name__,
-    url_prefix="<int:filtering_policy_id>/rules",
+    url_prefix="<id:filtering_policy_id>/rules",
     description="Firewall Rules API",
 )
 
@@ -47,39 +57,60 @@ class FirewallRuleFilteringPolicySchema(Schema):
     firewall = Nested(FirewallRuleFirewallSchema)
 
 
+class FirewallRuleNetworkAddressSchema(Schema):
+    address = String(validate=IsValidIPAddressOrSubnetCIDR(), required=True)
+    port = Integer(validate=is_valid_tcp_port(), required=True)
+
+
+class FirewallRulePortSchema(Schema):
+    number = Integer(validate=is_valid_tcp_port(), required=True)
+
+
 class FirewallRuleSchema(Schema):
     id = Integer(dump_only=True)
-    filtering_policy_id = Integer(dump_only=True)
-
     action = Enum(FirewallAction, required=True)
 
-    source_address_pattern = String(required=True)
-    source_port = Integer(required=True)
+    sources = Nested(
+        FirewallRuleNetworkAddressSchema,
+        many=True,
+        required=True,
+        validate=Length(1),
+    )
+    destinations = Nested(
+        FirewallRuleNetworkAddressSchema,
+        many=True,
+        required=True,
+        validate=Length(1),
+    )
 
-    destination_address_pattern = String(required=True)
-    destination_port = Integer(required=True)
+    ports = Nested(
+        FirewallRulePortSchema, many=True, required=True, validate=Length(1)
+    )
 
     filtering_policy = Nested(FirewallRuleFilteringPolicySchema, dump_only=True)
 
 
-class FirewallRuleFilterSchema(ListQueryArgSchema):
+class FirewallRuleFilterSchema(Schema):
     action = Enum(FirewallAction)
-    source_address_pattern = String()
-    source_port = Integer()
-    destination_address_pattern = String()
-    destination_port = Integer()
+    source_address = String(validate=IsValidIPAddressOrSubnetCIDR())
+    source_port = Integer(validate=is_valid_tcp_port())
+    destination_address = String(validate=IsValidIPAddressOrSubnetCIDR())
+    destination_port = Integer(validate=is_valid_tcp_port())
+    port = Integer(validate=is_valid_tcp_port())
 
 
 @rules.route("/")
 class FirewallRules(MethodView):
     @auth.login_required
     @rules.arguments(FirewallRuleFilterSchema, location="query")
-    @rules.response(200, FirewallRuleSchema(many=True))
+    @rules.response(200, PageSchema(FirewallRuleSchema))
+    @rules.paginate()
     def get(
         self,
         args: dict[str, Any],
         firewall_id: int,
         filtering_policy_id: int,
+        pagination_parameters: PaginationParameters,
     ) -> Pagination:
         """
         Fetch a paginated list of `FirewallRule` records
@@ -90,16 +121,22 @@ class FirewallRules(MethodView):
             firewall_id, filtering_policy_id, db
         )
 
-        return db.paginate(
-            repository.filter(**strip_base_values(args)),
-            page=args["page"],
-            per_page=args["per_page"],
+        page = db.paginate(
+            repository.filter(**args),
+            page=pagination_parameters.page,
+            per_page=pagination_parameters.page_size,
             max_per_page=settings.max_per_page,
         )
+
+        pagination_parameters.item_count = page.total
+
+        return page
 
     @auth.login_required
     @rules.arguments(FirewallRuleSchema)
     @rules.response(201, FirewallRuleSchema)
+    @rules.alt_response(404, schema=ErrorSchema)
+    @rules.alt_response(422, schema=ErrorSchema)
     def post(
         self,
         new_rule_data: dict[str, Any],
@@ -116,19 +153,39 @@ class FirewallRules(MethodView):
         try:
             rule = create_firewall_rule(
                 CreateFirewallRuleCommand(
-                    **new_rule_data, filtering_policy_id=filtering_policy_id
+                    action=new_rule_data["action"],
+                    sources=[
+                        CreateFirewallRuleNetworkAddressCommand(**source)
+                        for source in new_rule_data["sources"]
+                    ],
+                    destinations=[
+                        CreateFirewallRuleNetworkAddressCommand(**source)
+                        for source in new_rule_data["destinations"]
+                    ],
+                    ports=[
+                        CreateFirewallRulePortCommand(**port)
+                        for port in new_rule_data["ports"]
+                    ],
+                    filtering_policy_id=filtering_policy_id,
                 )
             )
         except NoResultFound:
-            abort(404)
+            abort_not_found(
+                "filtering-policy",
+                id=filtering_policy_id,
+                firewall_id=firewall_id,
+            )
+        except IntegrityError:
+            abort_already_exists("rule")
 
         return rule
 
 
-@rules.route("/<int:rule_id>/")
+@rules.route("/<id:rule_id>/")
 class FirewallRuleById(MethodView):
     @auth.login_required
     @rules.response(200, FirewallRuleSchema)
+    @rules.alt_response(404, schema=ErrorSchema)
     def get(
         self, firewall_id: int, filtering_policy_id: int, rule_id: int
     ) -> FirewallRule:
@@ -139,12 +196,19 @@ class FirewallRuleById(MethodView):
             firewall_id, filtering_policy_id, db
         )
 
-        return db.one_or_404(
-            repository.select().where(FirewallRule.id == rule_id)
-        )
+        try:
+            return repository.get(rule_id)
+        except NoResultFound:
+            abort_not_found(
+                "rule",
+                id=rule_id,
+                filtering_policy_id=filtering_policy_id,
+                firewall_id=firewall_id,
+            )
 
     @auth.login_required
     @rules.response(204, None)
+    @rules.alt_response(404, schema=ErrorSchema)
     def delete(
         self,
         firewall_id: int,
@@ -162,4 +226,9 @@ class FirewallRuleById(MethodView):
         try:
             delete_rule(DeleteFirewallRuleCommand(id=rule_id))
         except NoResultFound:
-            abort(404)
+            abort_not_found(
+                "rule",
+                id=rule_id,
+                filtering_policy_id=filtering_policy_id,
+                firewall_id=firewall_id,
+            )
