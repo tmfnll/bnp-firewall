@@ -106,7 +106,7 @@ class FilteringPolicies(MethodView):
     @filtering_policies.arguments(FilteringPolicySchema)
     @filtering_policies.response(201, FilteringPolicySchema)
     @filtering_policies.alt_response(404, schema=ErrorSchema)
-    @filtering_policies.alt_response(422, schema=ErrorSchema)
+    @filtering_policies.alt_response(409, schema=ErrorSchema)
     def post(
         self,
         new_filtering_policy: dict[str, Any],
