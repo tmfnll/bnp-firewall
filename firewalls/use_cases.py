@@ -6,7 +6,11 @@ from firewalls.models import (
     Firewall,
     FirewallAction,
     FirewallRule,
+    FirewallRuleDestination,
+    FirewallRulePort,
+    FirewallRuleSource,
 )
+from firewalls.services import build_firewall_rule
 from repository import Repository
 from use_case import UseCase
 
@@ -61,12 +65,21 @@ class CreateFilteringPolicy(
 
 
 @dataclass(frozen=True)
-class CreateFirewallRuleCommand:
-    source_address_pattern: str
-    source_port: int
+class CreateFirewallRuleNetworkAddressCommand:
+    address: str
+    port: int
 
-    destination_address_pattern: str
-    destination_port: int
+
+@dataclass(frozen=True)
+class CreateFirewallRulePortCommand:
+    number: int
+
+
+@dataclass(frozen=True)
+class CreateFirewallRuleCommand:
+    sources: list[CreateFirewallRuleNetworkAddressCommand]
+    destinations: list[CreateFirewallRuleNetworkAddressCommand]
+    ports: list[CreateFirewallRulePortCommand]
 
     action: FirewallAction
 
@@ -88,11 +101,20 @@ class CreateFirewallRule(UseCase[CreateFirewallRuleCommand, FirewallRule]):
             command.filtering_policy_id
         )
 
-        firewall_rule = FirewallRule(
-            source_address_pattern=command.source_address_pattern,
-            source_port=command.source_port,
-            destination_address_pattern=command.destination_address_pattern,
-            destination_port=command.destination_port,
+        firewall_rule = build_firewall_rule(
+            sources=[
+                FirewallRuleSource(address=source.address, port=source.port)
+                for source in command.sources
+            ],
+            destinations=[
+                FirewallRuleDestination(
+                    address=destination.address, port=destination.port
+                )
+                for destination in command.destinations
+            ],
+            ports=[
+                FirewallRulePort(number=port.number) for port in command.ports
+            ],
             action=command.action,
             filtering_policy=filtering_policy,
         )
