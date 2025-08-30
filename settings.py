@@ -43,3 +43,7 @@ class Settings(BaseSettings, frozen=True):  # type: ignore[misc]
         env_prefix="settings_",
         extra="ignore",
     )
+
+    @property
+    def is_local(self) -> bool:
+        return self.environment is Environment.LOCAL

@@ -3,7 +3,7 @@ from flask_smorest import Api
 
 from auth import print_jwt_cmd
 from converters import IdConverter, id_converter_params
-from db import db, migrate
+from db import db, migrate, recreate_db_command
 from firewalls import models  # noqa: F401 to register models with SQLAlchemy
 from firewalls.flask.views import firewalls
 from health import health
@@ -55,6 +55,7 @@ def initialise_app(flask: Flask, settings_: Settings) -> None:
     api.register_blueprint(health)
 
     flask.cli.command("jwt")(print_jwt_cmd)
+    flask.cli.command("recreate-db")(recreate_db_command)
 
 
 initialise_app(app, settings)

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Self, TypeAlias
 
+from flask import current_app
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import DateTime, func
@@ -43,3 +44,15 @@ db = SQLAlchemy(model_class=Base)
 migrate = Migrate()
 
 BaseModel: TypeAlias = db.Model  # type: ignore[name-defined]
+
+
+def recreate_db_command() -> None:
+    settings_ = current_app.config["SETTINGS"]
+
+    if not settings_.is_local:
+        raise RuntimeError(
+            "Cannot recreate the database unless in the local environment"
+        )
+
+    db.drop_all()
+    db.create_all()

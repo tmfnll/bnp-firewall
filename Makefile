@@ -85,7 +85,7 @@ local_run: .env migrate ##  Run the app locally
 
 .PHONY: recreate_db
 recreate_db:  ## Recreate the database
-	flask shell <<< 'from db import db; db.drop_all(); db.create_all()'
+	flask recreate-db
 
 .PHONY: schemathesis
 schemathesis:  recreate_db  ## Use schemathesis to test the API
