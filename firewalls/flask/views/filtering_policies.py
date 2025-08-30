@@ -8,7 +8,6 @@ from flask_smorest.pagination import PaginationParameters
 from flask_sqlalchemy.pagination import Pagination
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
-from auth import auth
 from db import db
 from firewalls.flask.exceptions import abort_already_exists, abort_not_found
 from firewalls.flask.links import links, operation
@@ -43,7 +42,7 @@ filtering_policies.register_blueprint(rules)
 
 @filtering_policies.route("/")
 class FilteringPolicies(MethodView):
-    @auth.login_required
+
     @filtering_policies.arguments(FilteringPolicyFilterSchema, location="query")
     @filtering_policies.response(200, PageSchema(FilteringPolicySchema))
     @filtering_policies.paginate()
@@ -71,7 +70,6 @@ class FilteringPolicies(MethodView):
 
         return page
 
-    @auth.login_required
     @links(
         filtering_policies,
         201,
@@ -127,7 +125,7 @@ class FilteringPolicies(MethodView):
 
 @filtering_policies.route("/<id:filtering_policy_id>/")
 class FilteringPolicyById(MethodView):
-    @auth.login_required
+
     @filtering_policies.response(200, FilteringPolicySchema)
     @filtering_policies.alt_response(404, schema=ErrorSchema)
     @operation(filtering_policies, "getFilteringPolicyById")
@@ -148,7 +146,6 @@ class FilteringPolicyById(MethodView):
                 firewall_id=firewall_id,
             )
 
-    @auth.login_required
     @filtering_policies.response(204, None)
     @filtering_policies.alt_response(404, schema=ErrorSchema)
     @operation(filtering_policies, "deleteFilteringPolicyById")
