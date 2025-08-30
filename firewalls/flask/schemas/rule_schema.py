@@ -1,9 +1,15 @@
-from marshmallow import Schema
 from marshmallow.fields import Enum, Integer, Nested, String
 from marshmallow.validate import Length
 
 from ...models import FirewallAction
-from .base import BaseSchema, IpOrSubnetCidrField, PortField
+from ...repositories import FirewallRuleOrderBy
+from .base import (
+    BaseSchema,
+    IpOrSubnetCidrField,
+    OrderByEnum,
+    PortField,
+    QueryParametersSchema,
+)
 
 
 class FirewallRuleFirewallSchema(BaseSchema):
@@ -52,10 +58,11 @@ class FirewallRuleSchema(BaseSchema):
     filtering_policy = Nested(FirewallRuleFilteringPolicySchema, dump_only=True)
 
 
-class FirewallRuleFilterSchema(Schema):
+class FirewallRuleFilterSchema(QueryParametersSchema):
     action = Enum(FirewallAction)
     source_address = IpOrSubnetCidrField(example=None)
     source_port = PortField(example=None)
     destination_address = IpOrSubnetCidrField(example=None)
     destination_port = PortField(example=None)
     port = PortField(example=None)
+    order_by = OrderByEnum(FirewallRuleOrderBy)

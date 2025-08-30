@@ -95,6 +95,38 @@ class TestFirewalls:
             assert item["id"] == firewall.id
             assert item["name"] == firewall.name
 
+        @pytest.mark.parametrize(
+            ("order_by", "reverse"),
+            (("id", False), ("-id", True), ("name", False), ("-name", True)),
+        )
+        def test_it_sorts_data(
+            self,
+            firewall: Firewall,
+            another_firewall: Firewall,
+            client: FlaskClient,
+            order_by: str,
+            reverse: bool,
+        ) -> None:
+            response = client.get(f"/firewalls/?order_by={order_by}")
+
+            assert response.status_code == 200
+
+            if order_by.startswith("-"):
+                order_by = order_by[1:]
+
+            data = response.json
+
+            assert data is not None
+
+            assert [item["id"] for item in data["items"]] == [
+                firewall_.id
+                for firewall_ in sorted(
+                    [firewall, another_firewall],
+                    key=lambda f: getattr(f, order_by),
+                    reverse=reverse,
+                )
+            ]
+
         class TestWhenTheFirewallIsSoftDeleted:
             @pytest.fixture
             def firewall_deleted_at(self) -> datetime:

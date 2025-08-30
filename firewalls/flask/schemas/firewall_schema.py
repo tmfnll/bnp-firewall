@@ -1,9 +1,9 @@
-from marshmallow import Schema
 from marshmallow.fields import Enum, Integer, Nested, String
 
 from ...models import FirewallAction
+from ...repositories import FirewallOrderBy
 from ..validations import not_just_whitespace
-from .base import BaseSchema
+from .base import BaseSchema, OrderByEnum, QueryParametersSchema
 from .rule_schema import (
     FirewallRuleNetworkAddressSchema,
     FirewallRulePortSchema,
@@ -38,5 +38,6 @@ class FirewallSchema(BaseSchema):
     )
 
 
-class FirewallFilterSchema(Schema):
+class FirewallFilterSchema(QueryParametersSchema):
     name = String()
+    order_by = OrderByEnum(FirewallOrderBy)

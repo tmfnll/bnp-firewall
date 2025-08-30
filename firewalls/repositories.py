@@ -1,4 +1,5 @@
-from typing import Any
+from enum import StrEnum
+from typing import Any, Iterable, cast
 
 from sqlalchemy import Select
 from sqlalchemy.orm import joinedload, selectinload
@@ -14,6 +15,22 @@ from firewalls.models import (
 from repository import Repository
 
 
+def order_by_enum(name: str, attrs: Iterable[str]) -> type[StrEnum]:
+    enum_values: dict[str, str] = {
+        "id": "id",
+        "id__desc": "-id",
+    }
+
+    for attr in attrs:
+        enum_values[attr] = attr
+        enum_values[f"{attr}__desc"] = f"-{attr}"
+
+    return cast(type[StrEnum], StrEnum(name, enum_values))
+
+
+FirewallOrderBy = order_by_enum("FirewallOrderBy", ["name"])
+
+
 class FirewallRepository(Repository):
     model_type = Firewall
 
@@ -22,6 +39,11 @@ class FirewallRepository(Repository):
             FilteringPolicy.rules
         )
     ]
+
+
+FilteringPolicyOrderBy = order_by_enum(
+    "FilteringPolicyOrderBy", ["name", "default_action"]
+)
 
 
 class NestedFilteringPolicyRepository(Repository):
@@ -51,13 +73,16 @@ class NestedFilteringPolicyRepository(Repository):
         return select_
 
 
+FirewallRuleOrderBy = order_by_enum("FirewallRuleOrderBy", ["action"])
+
+
 class NestedFirewallRuleRepository(Repository[FirewallRule]):
     def __init__(
         self,
         firewall_id: int,
         filtering_policy_id: int,
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ):
         super().__init__(*args, **kwargs)
 
@@ -99,12 +124,13 @@ class NestedFirewallRuleRepository(Repository[FirewallRule]):
 
     def filter(
         self,
+        *,
         source_address: str | None = None,
         source_port: int | None = None,
         destination_address: str | None = None,
         destination_port: int | None = None,
         port: int | None = None,
-        **filters: Any
+        **filters: Any,
     ) -> Select:
         select_ = super().filter(**filters)
 

@@ -196,6 +196,47 @@ class TestFirewallRules:
                 "ports": [{"number": port.number} for port in rule.ports],
             }
 
+        @pytest.mark.parametrize(
+            ("order_by", "reverse"),
+            (
+                ("id", False),
+                ("-id", True),
+                ("action", False),
+                ("-action", True),
+            ),
+        )
+        def test_it_sorts_data(
+            self,
+            firewall: Firewall,
+            filtering_policy: FilteringPolicy,
+            rule: FirewallRule,
+            another_rule: FirewallRule,
+            client: FlaskClient,
+            order_by: str,
+            reverse: bool,
+        ) -> None:
+            response = client.get(
+                f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id}/rules/?order_by={order_by}"
+            )
+
+            assert response.status_code == 200
+
+            if order_by.startswith("-"):
+                order_by = order_by[1:]
+
+            data = response.json
+
+            assert data is not None
+
+            assert [item["id"] for item in data["items"]] == [
+                rule_.id
+                for rule_ in sorted(
+                    [rule, another_rule],
+                    key=lambda r: getattr(r, order_by),
+                    reverse=reverse,
+                )
+            ]
+
         class TestWhenTheFirewallRuleIsSoftDeleted:
             @pytest.fixture
             def rule_deleted_at(self) -> datetime:
