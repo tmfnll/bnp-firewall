@@ -24,6 +24,7 @@ pydantic-settings = "^2.10.1"
 flask-migrate = "^4.1.0"
 flask-smorest = "^0.46.1"
 flask-httpauth = "^4.8.0"
+pyjwt = "^2.10.1"
 
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"

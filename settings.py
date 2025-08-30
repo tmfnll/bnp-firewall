@@ -36,7 +36,7 @@ class Settings(BaseSettings, frozen=True):  # type: ignore[misc]
 
     max_per_page: int = 100
 
-    api_key: str
+    jwt_secret: str
 
     model_config = SettingsConfigDict(
         env_file=root_directory() / ".env",

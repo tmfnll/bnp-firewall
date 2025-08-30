@@ -91,6 +91,10 @@ recreate_db:  ## Recreate the database
 schemathesis:  recreate_db  ## Use schemathesis to test the API
 	schemathesis run http://127.0.0.1:8080/docs/openapi.json --generation-unique-inputs --output-sanitize false
 
+.PHONY: jwt
+jwt: ## Use schemathesis to test the API
+	@flask jwt
+
 .PHONY: help
 help: ## Display this help text
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'

@@ -52,9 +52,15 @@ docker compose up fireflow
 
 4. Open your browser and view the [swagger documentation](http://localhost:8080/docs/swagger-ui)
 
-5. Configure authentication by clicking the `Authorize` button and entering the token defined in `.env.dev` (the default is `test`)
+5. Generate a new test JWT and copy it to your clipboard
 
-6. Explore the API by trying out the endpoints in the swagger documentation.
+```shell
+make jwt
+```
+
+6. Configure authentication by clicking the `Authorize` button and entering the JWT 
+
+7. Explore the API by trying out the endpoints in the swagger documentation.
 
 ## Running Locally 🐍
 
