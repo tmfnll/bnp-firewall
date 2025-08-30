@@ -1,7 +1,7 @@
 from flask import Flask
 from flask_smorest import Api
 
-from auth import print_jwt_cmd, require_login
+from auth import print_jwt_cmd
 from converters import IdConverter, id_converter_params
 from db import db, migrate
 from firewalls import models  # noqa: F401 to register models with SQLAlchemy
@@ -53,8 +53,6 @@ def initialise_app(flask: Flask, settings_: Settings) -> None:
 
     api.register_blueprint(firewalls)
     api.register_blueprint(health)
-
-    flask.before_request(require_login)
 
     flask.cli.command("jwt")(print_jwt_cmd)
 

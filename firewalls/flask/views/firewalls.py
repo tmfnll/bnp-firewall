@@ -8,6 +8,7 @@ from flask_smorest.pagination import PaginationParameters
 from flask_sqlalchemy.pagination import Pagination
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
+from auth import require_login
 from db import db
 from firewalls.flask.exceptions import (
     abort_already_exists,
@@ -33,6 +34,8 @@ firewalls = Blueprint(
 from .filtering_policies import filtering_policies
 
 firewalls.register_blueprint(filtering_policies)
+
+firewalls.before_request(require_login)
 
 
 @firewalls.route("/")

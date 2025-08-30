@@ -5,7 +5,11 @@ from flask_smorest import Blueprint
 from marshmallow import Schema
 from marshmallow.fields import Enum
 
+from auth import require_login
+
 health = Blueprint("health", __name__, url_prefix="/health")
+
+health.before_request(require_login)
 
 
 class HealthCheckStatus(StrEnum):
