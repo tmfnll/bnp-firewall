@@ -1,7 +1,8 @@
+from enum import StrEnum
 from typing import Any, cast
 
 from marshmallow import Schema
-from marshmallow.fields import Integer, Nested, String
+from marshmallow.fields import Enum, Integer, Nested, String
 
 from firewalls.flask.validations import (
     IsValidIPAddressOrSubnetCIDR,
@@ -87,3 +88,24 @@ def port_field(
 
 
 PortField = port_field
+
+
+class QueryParametersSchema(Schema):
+    pass
+
+
+def order_by_enum(
+    enum: type[StrEnum],
+    *args: Any,
+    **kwargs: Any,
+) -> Enum:
+    return Enum(
+        enum,
+        by_value=True,
+        *args,
+        load_default=getattr(enum, "id"),
+        **kwargs,
+    )
+
+
+OrderByEnum = order_by_enum

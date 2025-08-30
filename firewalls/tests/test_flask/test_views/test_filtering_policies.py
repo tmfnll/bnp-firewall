@@ -125,6 +125,48 @@ class TestFilteringPolicies:
             assert items[0]["id"] == filtering_policy.id
             assert items[0]["name"] == filtering_policy.name
 
+        @pytest.mark.parametrize(
+            ("order_by", "reverse"),
+            (
+                ("id", False),
+                ("-id", True),
+                ("name", False),
+                ("-name", True),
+                ("default_action", False),
+                ("-default_action", True),
+            ),
+        )
+        def test_it_sorts_data(
+            self,
+            firewall: Firewall,
+            filtering_policy: FilteringPolicy,
+            another_filtering_policy: FilteringPolicy,
+            client: FlaskClient,
+            order_by: str,
+            reverse: bool,
+        ) -> None:
+            response = client.get(
+                f"/firewalls/{firewall.id}/filtering-policies/?order_by={order_by}"
+            )
+
+            assert response.status_code == 200
+
+            if order_by.startswith("-"):
+                order_by = order_by[1:]
+
+            data = response.json
+
+            assert data is not None
+
+            assert [item["id"] for item in data["items"]] == [
+                filtering_policy_.id
+                for filtering_policy_ in sorted(
+                    [filtering_policy, another_filtering_policy],
+                    key=lambda f: getattr(f, order_by),
+                    reverse=reverse,
+                )
+            ]
+
         class TestWhenTheFilteringPolicyIsSoftDeleted:
             @pytest.fixture
             def filtering_policy_deleted_at(self) -> datetime:

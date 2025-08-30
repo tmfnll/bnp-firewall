@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from enum import StrEnum
 from typing import Any, Generic, TypeVar
 
 from flask_sqlalchemy import SQLAlchemy
@@ -44,11 +45,25 @@ class Repository(Generic[T], ABC):
     def select(self) -> Select:
         return self.select_all().where(self.model_type.deleted_at.is_(None))
 
-    def filter(self, **filters: Any) -> Select:
+    def filter(
+        self, *, order_by: StrEnum | None = None, **filters: Any
+    ) -> Select:
         select_ = self.select()
 
         for attr, value in filters.items():
             select_ = select_.where(getattr(self.model_type, attr) == value)
+
+        if order_by is not None:
+            order_by_value = order_by.value
+
+            if order_by.value.startswith("-"):
+                order_by_clause = getattr(
+                    self.model_type, order_by_value[1:]
+                ).desc()
+            else:
+                order_by_clause = getattr(self.model_type, order_by_value).asc()
+
+            select_ = select_.order_by(order_by_clause)
 
         return select_
 
