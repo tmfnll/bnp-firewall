@@ -2,12 +2,13 @@ from typing import Any, Generator, cast
 
 import pytest
 from flask import Flask
-from flask.testing import FlaskClient
+from flask.testing import FlaskClient, FlaskCliRunner
 from flask_sqlalchemy import SQLAlchemy
 from flask_sqlalchemy.session import Session
 from sqlalchemy.orm import scoped_session
 
 from app import initialise_app
+from auth import User, encode_jwt
 from db import db
 from settings import Settings
 
@@ -32,6 +33,7 @@ def app(settings: Settings) -> Generator[Flask]:
 
     yield app
 
+
 @pytest.fixture
 def app_context(app: Flask) -> Generator[Flask]:
     with app.app_context():
@@ -50,6 +52,11 @@ def db_(
     yield db
 
 
+@pytest.fixture
+def test_cli_runner(app: Flask) -> FlaskCliRunner:
+    return app.test_cli_runner(catch_exceptions=False)
+
+
 class DefaultHeaderFlaskClient(FlaskClient):
     def __init__(
         self, *args: Any, headers: dict[str, str] | None = None, **kwargs: Any
@@ -66,8 +73,18 @@ class DefaultHeaderFlaskClient(FlaskClient):
 
 
 @pytest.fixture
-def auth_headers(settings: Settings) -> dict[str, str]:
-    return {"Authorization": f"Bearer {settings.api_key}"}
+def user() -> User:
+    return User(username="test_user")
+
+
+@pytest.fixture
+def user_jwt(settings: Settings, user: User) -> str:
+    return encode_jwt(settings, user)
+
+
+@pytest.fixture
+def auth_headers(settings: Settings, user_jwt: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {user_jwt}"}
 
 
 @pytest.fixture
