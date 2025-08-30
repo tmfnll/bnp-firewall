@@ -6,23 +6,20 @@ from flask_smorest import Blueprint
 from flask_smorest.error_handler import ErrorSchema
 from flask_smorest.pagination import PaginationParameters
 from flask_sqlalchemy.pagination import Pagination
-from marshmallow import Schema
-from marshmallow.fields import Enum, Integer, Nested, String
-from marshmallow.validate import Length
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
 from auth import auth
 from db import db
 from firewalls.flask.exceptions import abort_already_exists, abort_not_found
 from firewalls.flask.links import links, operation
-from firewalls.flask.shemas import (
-    BaseSchema,
-    IpOrSubnetCidrField,
+from firewalls.flask.schemas.base import (
     PageSchema,
-    PortField,
+)
+from firewalls.flask.schemas.rule_schema import (
+    FirewallRuleFilterSchema,
+    FirewallRuleSchema,
 )
 from firewalls.models import (
-    FirewallAction,
     FirewallRule,
 )
 from firewalls.repositories import (
@@ -44,61 +41,6 @@ rules = Blueprint(
     url_prefix="<id:filtering_policy_id>/rules",
     description="Firewall Rules API",
 )
-
-
-class FirewallRuleFirewallSchema(BaseSchema):
-    id = Integer()
-    name = String()
-
-
-class FirewallRuleFilteringPolicySchema(BaseSchema):
-    id = Integer()
-    name = String()
-    default_action = Enum(FirewallAction)
-
-    firewall = Nested(FirewallRuleFirewallSchema)
-
-
-class FirewallRuleNetworkAddressSchema(BaseSchema):
-    address = IpOrSubnetCidrField(required=True)
-    port = PortField(required=True)
-
-
-class FirewallRulePortSchema(BaseSchema):
-    number = PortField(required=True)
-
-
-class FirewallRuleSchema(BaseSchema):
-    id = Integer(dump_only=True)
-    action = Enum(FirewallAction, required=True)
-
-    sources = Nested(
-        FirewallRuleNetworkAddressSchema,
-        many=True,
-        required=True,
-        validate=Length(1),
-    )
-    destinations = Nested(
-        FirewallRuleNetworkAddressSchema,
-        many=True,
-        required=True,
-        validate=Length(1),
-    )
-
-    ports = Nested(
-        FirewallRulePortSchema, many=True, required=True, validate=Length(1)
-    )
-
-    filtering_policy = Nested(FirewallRuleFilteringPolicySchema, dump_only=True)
-
-
-class FirewallRuleFilterSchema(Schema):
-    action = Enum(FirewallAction)
-    source_address = IpOrSubnetCidrField(example=None)
-    source_port = PortField(example=None)
-    destination_address = IpOrSubnetCidrField(example=None)
-    destination_port = PortField(example=None)
-    port = PortField(example=None)
 
 
 @rules.route("/")

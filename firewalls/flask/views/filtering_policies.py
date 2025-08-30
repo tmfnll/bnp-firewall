@@ -6,17 +6,14 @@ from flask_smorest import Blueprint
 from flask_smorest.error_handler import ErrorSchema
 from flask_smorest.pagination import PaginationParameters
 from flask_sqlalchemy.pagination import Pagination
-from marshmallow import Schema
-from marshmallow.fields import Enum, Integer, Nested, String
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
 from auth import auth
 from db import db
 from firewalls.flask.exceptions import abort_already_exists, abort_not_found
 from firewalls.flask.links import links, operation
-from firewalls.flask.shemas import BaseSchema, PageSchema
-from firewalls.flask.validations import not_just_whitespace
-from firewalls.models import FilteringPolicy, FirewallAction
+from firewalls.flask.schemas.base import PageSchema
+from firewalls.models import FilteringPolicy
 from firewalls.repositories import (
     FirewallRepository,
     NestedFilteringPolicyRepository,
@@ -28,9 +25,8 @@ from firewalls.use_cases import (
     DeleteFilteringPolicyCommand,
 )
 
+from ..schemas import FilteringPolicyFilterSchema, FilteringPolicySchema
 from .rules import (
-    FirewallRuleNetworkAddressSchema,
-    FirewallRulePortSchema,
     rules,
 )
 
@@ -43,37 +39,6 @@ filtering_policies = Blueprint(
 
 
 filtering_policies.register_blueprint(rules)
-
-
-class FilteringPolicyFirewallSchema(BaseSchema):
-    id = Integer()
-    name = String()
-
-
-class FilteringPolicyFirewallRuleSchema(BaseSchema):
-    id = Integer()
-
-    action = Enum(FirewallAction)
-
-    sources = Nested(FirewallRuleNetworkAddressSchema, many=True)
-    destinations = Nested(FirewallRuleNetworkAddressSchema, many=True)
-
-    ports = Nested(FirewallRulePortSchema, many=True)
-
-
-class FilteringPolicySchema(BaseSchema):
-    id = Integer(dump_only=True)
-    firewall = Nested(FilteringPolicyFirewallSchema, dump_only=True)
-    rules = Nested(FilteringPolicyFirewallRuleSchema, dump_only=True, many=True)
-
-    name = String(required=True, validate=not_just_whitespace())
-
-    default_action = Enum(FirewallAction, required=True)
-
-
-class FilteringPolicyFilterSchema(Schema):
-    name = String()
-    default_action = Enum(FirewallAction)
 
 
 @filtering_policies.route("/")
