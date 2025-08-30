@@ -6,8 +6,6 @@ from flask_smorest import Blueprint
 from flask_smorest.error_handler import ErrorSchema
 from flask_smorest.pagination import PaginationParameters
 from flask_sqlalchemy.pagination import Pagination
-from marshmallow import Schema
-from marshmallow.fields import Enum, Integer, Nested, String
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
 from auth import auth
@@ -17,9 +15,8 @@ from firewalls.flask.exceptions import (
     abort_not_found,
 )
 from firewalls.flask.links import links, operation
-from firewalls.flask.shemas import BaseSchema, PageSchema
-from firewalls.flask.validations import not_just_whitespace
-from firewalls.models import Firewall, FirewallAction
+from firewalls.flask.schemas.base import PageSchema
+from firewalls.models import Firewall
 from firewalls.repositories import FirewallRepository
 from firewalls.use_cases import (
     CreateFirewall,
@@ -28,7 +25,7 @@ from firewalls.use_cases import (
     DeleteFirewallCommand,
 )
 
-from .rules import FirewallRuleNetworkAddressSchema, FirewallRulePortSchema
+from ..schemas import FirewallFilterSchema, FirewallSchema
 
 firewalls = Blueprint(
     "firewalls", __name__, url_prefix="/firewalls", description="Firewalls API"
@@ -37,38 +34,6 @@ firewalls = Blueprint(
 from .filtering_policies import filtering_policies
 
 firewalls.register_blueprint(filtering_policies)
-
-
-class FirewallFirewallRuleSchema(BaseSchema):
-    id = Integer()
-
-    action = Enum(FirewallAction)
-
-    sources = Nested(FirewallRuleNetworkAddressSchema, many=True)
-    destinations = Nested(FirewallRuleNetworkAddressSchema, many=True)
-
-    ports = Nested(FirewallRulePortSchema, many=True)
-
-
-class FirewallFilteringPolicySchema(BaseSchema):
-    id = Integer()
-    name = String()
-
-    default_action = Enum(FirewallAction)
-    rules = Nested(FirewallFirewallRuleSchema, many=True)
-
-
-class FirewallSchema(BaseSchema):
-    id = Integer(dump_only=True)
-    name = String(required=True, validate=not_just_whitespace())
-
-    filtering_policies = Nested(
-        FirewallFilteringPolicySchema, dump_only=True, many=True
-    )
-
-
-class FirewallFilterSchema(Schema):
-    name = String()
 
 
 @firewalls.route("/")
