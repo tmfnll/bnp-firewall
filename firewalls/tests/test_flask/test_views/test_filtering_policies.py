@@ -11,6 +11,7 @@ from firewalls.models import (
     FirewallRule,
 )
 from firewalls.repositories import FilteringPolicyOrderBy
+from firewalls.tests.factories import FirewallRuleFactory
 
 
 class TestFilteringPolicies:
@@ -363,6 +364,7 @@ class TestFilteringPoliciesById:
                 {
                     "id": rule.id,
                     "action": rule.action.name,
+                    "priority": rule.priority,
                     "sources": [
                         {
                             "address": source.address,
@@ -464,3 +466,148 @@ class TestFilteringPoliciesById:
             )
 
             assert response.status_code == 404
+
+
+class TestFilteringPolicyInspections:
+    class TestGet:
+        @pytest.fixture
+        def source_address(self) -> str:
+            return "123.123.0.1"
+
+        @pytest.fixture
+        def source_port(self) -> int:
+            return 8080
+
+        @pytest.fixture
+        def destination_address(self) -> str:
+            return "96.96.0.1"
+
+        @pytest.fixture
+        def destination_port(self) -> int:
+            return 9000
+
+        @pytest.fixture
+        def rule(
+            self,
+            filtering_policy: FilteringPolicy,
+            rule_deleted_at: datetime,
+            source_address: str,
+            source_port: int,
+            destination_address: str,
+            destination_port: int,
+        ) -> FirewallRule:
+            return FirewallRuleFactory.create(
+                filtering_policy=filtering_policy,
+                deleted_at=rule_deleted_at,
+                sources__address=source_address,
+                sources__port=source_port,
+                destinations__address=destination_address,
+                destinations__port=destination_port,
+            )
+
+        def test_an_unauthenticated_request_is_unauthorized(
+            self, unauthenticated_client: DefaultHeaderFlaskClient
+        ) -> None:
+            response = unauthenticated_client.get(
+                "/firewalls/1/filtering-policies/2/inspections/"
+            )
+
+            assert response.status_code == 401
+
+        def test_an_authorised_request_is_forbidden(
+            self, unauthorised_client: DefaultHeaderFlaskClient
+        ) -> None:
+            response = unauthorised_client.get(
+                "/firewalls/1/filtering-policies/2/inspections/"
+            )
+
+            assert response.status_code == 403
+
+        def test_it_returns_an_inspection(
+            self,
+            firewall: Firewall,
+            filtering_policy: FilteringPolicy,
+            rule: FirewallRule,
+            client: FlaskClient,
+            source_address: str,
+            source_port: int,
+            destination_address: str,
+            destination_port: int,
+        ) -> None:
+            response = client.get(
+                f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id}/inspections/?source_address={source_address}&source_port={source_port}&destination_address={destination_address}&destination_port={destination_port}"
+            )
+
+            assert response.status_code == 200
+            data = response.json
+
+            assert data is not None
+
+            assert data == {
+                "action": rule.action.name,
+                "active_rule": {
+                    "id": rule.id,
+                    "action": rule.action.name,
+                    "priority": rule.priority,
+                    "sources": [
+                        {
+                            "address": source.address,
+                            "port": source.port,
+                        }
+                        for source in rule.sources
+                    ],
+                    "destinations": [
+                        {
+                            "address": destination.address,
+                            "port": destination.port,
+                        }
+                        for destination in rule.destinations
+                    ],
+                    "ports": [{"number": port.number} for port in rule.ports],
+                },
+            }
+
+        def test_when_no_filtering_policy_exists_it_returns_404(
+            self,
+            client: FlaskClient,
+            firewall: Firewall,
+            source_address: str,
+            source_port: int,
+            destination_address: str,
+            destination_port: int,
+        ) -> None:
+            response = client.get(
+                f"/firewalls/{firewall.id}/filtering-policies/9999/inspections/?source_address={source_address}&source_port={source_port}&destination_address={destination_address}&destination_port={destination_port}"
+            )
+
+            assert response.status_code == 404
+
+        class TestWhenNoRuleMatches:
+            @pytest.fixture
+            def mismatched_source_address(self) -> str:
+                return "123.123.0.2"
+
+            def test_it_returns_an_inspection(
+                self,
+                firewall: Firewall,
+                filtering_policy: FilteringPolicy,
+                rule: FirewallRule,
+                client: FlaskClient,
+                mismatched_source_address: str,
+                source_port: int,
+                destination_address: str,
+                destination_port: int,
+            ) -> None:
+                response = client.get(
+                    f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id}/inspections/?source_address={mismatched_source_address}&source_port={source_port}&destination_address={destination_address}&destination_port={destination_port}"
+                )
+
+                assert response.status_code == 200
+                data = response.json
+
+                assert data is not None
+
+                assert data == {
+                    "action": filtering_policy.default_action.name,
+                    "active_rule": None,
+                }

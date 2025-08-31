@@ -13,7 +13,7 @@ from db import db
 from firewalls.flask.exceptions import abort_integrity_error, abort_not_found
 from firewalls.flask.links import links, operation
 from firewalls.flask.schemas.base import PageSchema
-from firewalls.models import FilteringPolicy
+from firewalls.models import FilteringPolicy, Packet
 from firewalls.repositories import (
     FirewallRepository,
     NestedFilteringPolicyRepository,
@@ -25,7 +25,12 @@ from firewalls.use_cases import (
     DeleteFilteringPolicyCommand,
 )
 
-from ..schemas import FilteringPolicyFilterSchema, FilteringPolicySchema
+from ..schemas import (
+    FilteringPolicyFilterSchema,
+    FilteringPolicySchema,
+    InspectionSchema,
+    PacketSchema,
+)
 from .rules import (
     rules,
 )
@@ -177,3 +182,38 @@ class FilteringPolicyById(MethodView):
                 id=filtering_policy_id,
                 firewall_id=firewall_id,
             )
+
+
+@filtering_policies.route("/<id:filtering_policy_id>/inspections/")
+class FirewallInspections(MethodView):
+    """
+    Inspect packets against a `FilteringPolicy`
+    """
+    @authorise(UserRole.VIEWER)
+    @filtering_policies.arguments(PacketSchema, location="query")
+    @filtering_policies.response(200, InspectionSchema)
+    @filtering_policies.alt_response(404, schema=ErrorSchema)
+    def get(
+        self, args: dict[str, Any], firewall_id: int, filtering_policy_id: int
+    ) -> dict[str, Any]:
+        repository = NestedFilteringPolicyRepository(firewall_id, db)
+
+        try:
+            filtering_policy = repository.get(filtering_policy_id)
+        except NoResultFound:
+            abort_not_found(
+                "filtering-policy",
+                id=filtering_policy_id,
+                firewall_id=firewall_id,
+            )
+
+        packet = Packet(
+            source_address=args["source_address"],
+            source_port=args["source_port"],
+            destination_address=args["destination_address"],
+            destination_port=args["destination_port"],
+        )
+
+        inspection = filtering_policy.inspect(packet)
+
+        return inspection

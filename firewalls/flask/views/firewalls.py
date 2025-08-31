@@ -25,7 +25,10 @@ from firewalls.use_cases import (
     DeleteFirewallCommand,
 )
 
-from ..schemas import FirewallFilterSchema, FirewallSchema
+from ..schemas import (
+    FirewallFilterSchema,
+    FirewallSchema,
+)
 
 firewalls = Blueprint(
     "firewalls", __name__, url_prefix="/firewalls", description="Firewalls API"

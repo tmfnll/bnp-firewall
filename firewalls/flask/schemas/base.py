@@ -3,11 +3,13 @@ from typing import Any, cast
 
 from marshmallow import Schema
 from marshmallow.fields import Enum, Integer, Nested, String
+from marshmallow.validate import Regexp
 
 from firewalls.flask.validations import (
     IsValidIPAddressOrSubnetCIDR,
     is_valid_tcp_port,
 )
+from firewalls.models import IP_REGEX
 
 
 class BaseSchema(Schema):
@@ -38,6 +40,34 @@ def page_schema(schema_type: type[Schema]) -> type[Schema]:
 
 
 PageSchema = page_schema
+
+
+def ip_address_field(
+    *args: Any,
+    example: str | None = "127.0.0.1",
+    description: str | None = "A valid IP address",
+    **kwargs: Any,
+) -> String:
+    metadata: dict[str, Any] = {}
+
+    if example is not None:
+        metadata["example"] = example
+
+    if description is not None:
+        metadata["description"] = description
+
+    return String(
+        *args,
+        validate=Regexp(
+            rf"\A{IP_REGEX}\Z",
+            error="{input} is not a valid IP address",
+        ),
+        metadata=metadata,
+        **kwargs,
+    )
+
+
+IpAddressField = ip_address_field
 
 
 def ip_or_subnet_cidr_field(

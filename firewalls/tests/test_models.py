@@ -6,6 +6,7 @@ from firewalls.models import (
     FilteringPolicy,
     FirewallAction,
     FirewallRule,
+    Inspection,
     Packet,
     ValidationError,
 )
@@ -174,7 +175,7 @@ class TestFilteringPolicy:
             "source_port",
             "destination_address",
             "destination_port",
-            "expected_action",
+            "rule_index",
         ),
         (
             (
@@ -182,14 +183,14 @@ class TestFilteringPolicy:
                 8080,
                 "99.99.99.99",
                 80,
-                FirewallAction.ALLOW,
+                0,
             ),
             (
                 "200.200.200.200",
                 8080,
                 "77.77.77.77",
                 80,
-                FirewallAction.DENY,
+                1,
             ),
             (
                 "255.255.255.255",  # Mismatched source address
@@ -205,14 +206,18 @@ class TestFilteringPolicy:
         filtering_policy: FilteringPolicy,
         rules: list[FirewallRule],
         packet: Packet,
-        expected_action: FirewallAction | None,
+        rule_index: int | None,
     ) -> None:
-        action = filtering_policy.inspect(packet)
+        inspection = filtering_policy.inspect(packet)
 
-        if expected_action is not None:
-            assert action is expected_action
+        if rule_index is not None:
+            rule = rules[rule_index]
+
+            assert inspection == Inspection(rule.action, rule)
         else:
-            assert action is filtering_policy.default_action
+            assert inspection == Inspection(
+                filtering_policy.default_action, None
+            )
 
     class TestPriority:
         @pytest.fixture
@@ -250,13 +255,13 @@ class TestFilteringPolicy:
             )
 
         @pytest.mark.parametrize(
-            ("priorities", "expected"),
+            ("priorities", "rule_index"),
             (
-                ((1, 2), FirewallAction.ALLOW),
-                ((2, 1), FirewallAction.DENY),
-                ((1, 1), FirewallAction.ALLOW),
-                ((-1, 1), FirewallAction.ALLOW),
-                ((1, -1), FirewallAction.DENY),
+                ((1, 2), 0),
+                ((2, 1), 1),
+                ((1, 1), 0),
+                ((-1, 1), 0),
+                ((1, -1), 1),
             ),
         )
         def test_prioritised_rules(
@@ -264,9 +269,13 @@ class TestFilteringPolicy:
             filtering_policy: FilteringPolicy,
             packet: Packet,
             rules: list[FirewallRule],
-            expected: FirewallAction,
+            rule_index: int,
         ) -> None:
-            assert filtering_policy.inspect(packet) is expected
+            rule = rules[rule_index]
+
+            assert filtering_policy.inspect(packet) == Inspection(
+                rule.action, rule
+            )
 
     @pytest.mark.parametrize(
         ("name", "is_valid"),

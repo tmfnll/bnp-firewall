@@ -44,6 +44,12 @@ class FirewallAction(StrEnum):
     DENY = "deny"
 
 
+@dataclass(frozen=True)
+class Inspection:
+    action: FirewallAction
+    active_rule: FirewallRule | None = None
+
+
 class FilteringPolicy(BaseModel):
     __tablename__ = "filtering_policies"
 
@@ -71,14 +77,14 @@ class FilteringPolicy(BaseModel):
     def prioritised_rules(self) -> list[FirewallRule]:
         return sorted(self.rules, key=lambda rule: rule.priority)
 
-    def inspect(self, packet: Packet) -> FirewallAction:
+    def inspect(self, packet: Packet) -> Inspection:
         for rule in self.prioritised_rules:
             action = rule.inspect(packet)
 
             if action is not None:
-                return action
+                return Inspection(action, rule)
 
-        return self.default_action
+        return Inspection(self.default_action, None)
 
     __table_args__ = (
         UniqueConstraint(
