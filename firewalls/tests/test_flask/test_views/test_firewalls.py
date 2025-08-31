@@ -21,6 +21,13 @@ class TestFirewalls:
 
             assert response.status_code == 401
 
+        def test_an_authorised_request_is_forbidden(
+            self, unauthorised_client: DefaultHeaderFlaskClient
+        ) -> None:
+            response = unauthorised_client.get("/firewalls/")
+
+            assert response.status_code == 403
+
         def test_it_returns_a_list_of_firewalls(
             self, firewall: Firewall, client: FlaskClient
         ) -> None:
@@ -161,6 +168,13 @@ class TestFirewalls:
 
             assert response.status_code == 401
 
+        def test_an_authorised_request_is_forbidden(
+            self, unauthorised_client: DefaultHeaderFlaskClient
+        ) -> None:
+            response = unauthorised_client.post("/firewalls/", json={})
+
+            assert response.status_code == 403
+
         def test_it_creates_a_firewall(
             self, client: FlaskClient, payload: dict[str, Any]
         ) -> None:
@@ -225,6 +239,13 @@ class TestFirewallsById:
             response = unauthenticated_client.get("/firewalls/1/")
 
             assert response.status_code == 401
+
+        def test_an_authorised_request_is_forbidden(
+            self, unauthorised_client: DefaultHeaderFlaskClient
+        ) -> None:
+            response = unauthorised_client.get("/firewalls/1/")
+
+            assert response.status_code == 403
 
         def test_it_returns_the_firewall(
             self,
@@ -311,6 +332,13 @@ class TestFirewallsById:
             response = unauthenticated_client.delete("/firewalls/1/")
 
             assert response.status_code == 401
+
+        def test_an_authorised_request_is_forbidden(
+            self, unauthorised_client: DefaultHeaderFlaskClient
+        ) -> None:
+            response = unauthorised_client.delete("/firewalls/1/")
+
+            assert response.status_code == 403
 
         def test_it_soft_deletes_the_firewall(
             self,

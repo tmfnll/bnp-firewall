@@ -2,16 +2,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from enum import StrEnum
+from typing import Callable, TypeVar
 
 import click
 import jwt
 from flask import current_app, g, request
 from flask_httpauth import HTTPTokenAuth
+from typing_extensions import ParamSpec
 from webargs.flaskparser import abort
 
 from settings import Settings
 
 auth = HTTPTokenAuth()
+
+
+@auth.error_handler
+def auth_error(status):
+    abort(status)
 
 
 @auth.verify_token
@@ -48,9 +56,17 @@ def require_login() -> None:
         )
 
 
+class UserRole(StrEnum):
+    ADMIN = "admin"
+    VIEWER = "viewer"
+    EDITOR = "editor"
+    HEALTH_CHECK = "health_check"
+
+
 @dataclass(frozen=True)
 class User:
     username: str
+    roles: tuple[UserRole, ...]
 
 
 JWT_ALGORITHM = "HS256"
@@ -62,7 +78,11 @@ def encode_jwt(
     expiry_datetime = datetime.now(tz=timezone.utc) + duration
 
     return jwt.encode(
-        {"username": user.username, "exp": expiry_datetime.timestamp()},
+        {
+            "username": user.username,
+            "roles": [role.value for role in user.roles],
+            "exp": expiry_datetime.timestamp(),
+        },
         settings.jwt_secret,
         algorithm=JWT_ALGORITHM,
     )
@@ -81,9 +101,27 @@ def decode_jwt(settings: Settings, token: str) -> User:
         raise AuthenticationError("Invalid token") from exc
 
     try:
-        return User(username=payload["username"])
-    except KeyError as exc:
+        return User(
+            username=payload["username"],
+            roles=tuple(UserRole(role) for role in payload["roles"]),
+        )
+    except (KeyError, ValueError) as exc:
         raise AuthenticationError("Invalid token payload") from exc
+
+
+@auth.get_user_roles
+def get_user_roles(user: User) -> list[str]:
+    return [UserRole.ADMIN.value] + [role.value for role in user.roles]
+
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+
+def authorise(
+    *allowed_roles: UserRole,
+) -> Callable[[Callable[P, T]], Callable[P, T]]:
+    return auth.login_required(role=[role.value for role in allowed_roles])
 
 
 @click.argument("username", default="test")
@@ -92,6 +130,8 @@ def print_jwt_cmd(username: str) -> None:
 
     print(
         encode_jwt(
-            settings_, User(username=username), duration=timedelta(days=30)
+            settings_,
+            User(username=username, roles=tuple(UserRole)),
+            duration=timedelta(days=30),
         )
     )

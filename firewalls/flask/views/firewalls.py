@@ -8,7 +8,7 @@ from flask_smorest.pagination import PaginationParameters
 from flask_sqlalchemy.pagination import Pagination
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
-from auth import require_login
+from auth import UserRole, authorise, require_login
 from db import db
 from firewalls.flask.exceptions import (
     abort_already_exists,
@@ -41,6 +41,7 @@ firewalls.before_request(require_login)
 @firewalls.route("/")
 class Firewalls(MethodView):
 
+    @authorise(UserRole.VIEWER)
     @firewalls.arguments(FirewallFilterSchema, location="query")
     @firewalls.response(200, PageSchema(FirewallSchema))
     @firewalls.paginate()
@@ -67,6 +68,7 @@ class Firewalls(MethodView):
 
         return page
 
+    @authorise(UserRole.EDITOR)
     @links(
         firewalls,
         201,
@@ -104,6 +106,7 @@ class Firewalls(MethodView):
 @firewalls.route("/<id:firewall_id>/")
 class FirewallById(MethodView):
 
+    @authorise(UserRole.VIEWER)
     @firewalls.response(200, FirewallSchema)
     @firewalls.alt_response(404, schema=ErrorSchema)
     @operation(firewalls, "getFirewallById")
@@ -118,6 +121,7 @@ class FirewallById(MethodView):
         except NoResultFound:
             abort_not_found("firewall", id=firewall_id)
 
+    @authorise(UserRole.EDITOR)
     @firewalls.response(204, None)
     @firewalls.alt_response(404, schema=ErrorSchema)
     @operation(firewalls, "deleteFirewallById")

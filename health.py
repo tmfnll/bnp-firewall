@@ -5,7 +5,7 @@ from flask_smorest import Blueprint
 from marshmallow import Schema
 from marshmallow.fields import Enum
 
-from auth import require_login
+from auth import UserRole, authorise, require_login
 
 health = Blueprint("health", __name__, url_prefix="/health")
 
@@ -27,6 +27,7 @@ class HealthCheckSchema(Schema):
 
 @health.route("/", methods=["GET"])
 @health.response(200, HealthCheckSchema)
+@authorise(UserRole.HEALTH_CHECK)
 def health_check() -> HealthCheck:
     """
     Health check endpoint to verify the service is running.

@@ -2,7 +2,7 @@ services:
   fireflow:
     volumes:
       - .:/app:cached
-      - ./instances:/instances:cached
+      - ./instance:/instance:cached
     build:
       context: .
       target: dev

@@ -8,6 +8,7 @@ from flask_smorest.pagination import PaginationParameters
 from flask_sqlalchemy.pagination import Pagination
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
+from auth import UserRole, authorise
 from db import db
 from firewalls.flask.exceptions import abort_already_exists, abort_not_found
 from firewalls.flask.links import links, operation
@@ -45,6 +46,7 @@ rules = Blueprint(
 @rules.route("/")
 class FirewallRules(MethodView):
 
+    @authorise(UserRole.VIEWER)
     @rules.arguments(FirewallRuleFilterSchema, location="query")
     @rules.response(200, PageSchema(FirewallRuleSchema))
     @rules.paginate()
@@ -75,6 +77,7 @@ class FirewallRules(MethodView):
 
         return page
 
+    @authorise(UserRole.EDITOR)
     @links(
         rules,
         201,
@@ -149,6 +152,7 @@ class FirewallRules(MethodView):
 @rules.route("/<id:rule_id>/")
 class FirewallRuleById(MethodView):
 
+    @authorise(UserRole.VIEWER)
     @rules.response(200, FirewallRuleSchema)
     @rules.alt_response(404, schema=ErrorSchema)
     @operation(rules, "getRuleById")
@@ -172,6 +176,7 @@ class FirewallRuleById(MethodView):
                 firewall_id=firewall_id,
             )
 
+    @authorise(UserRole.EDITOR)
     @rules.response(204, None)
     @rules.alt_response(404, schema=ErrorSchema)
     @operation(rules, "deleteRuleById")

@@ -23,6 +23,15 @@ class TestFilteringPolicies:
 
             assert response.status_code == 401
 
+        def test_an_authorised_request_is_forbidden(
+            self, unauthorised_client: DefaultHeaderFlaskClient
+        ) -> None:
+            response = unauthorised_client.get(
+                "/firewalls/1/filtering-policies/"
+            )
+
+            assert response.status_code == 403
+
         def test_it_returns_a_list_of_filtering_policies(
             self,
             firewall: Firewall,
@@ -212,6 +221,22 @@ class TestFilteringPolicies:
                 "status": "Unauthorized",
             }
 
+        def test_an_authorised_request_is_forbidden(
+            self, unauthorised_client: DefaultHeaderFlaskClient
+        ) -> None:
+            response = unauthorised_client.post(
+                "/firewalls/1/filtering-policies/", json={}
+            )
+
+            assert response.status_code == 403
+
+            assert response.json is not None
+
+            assert response.json == {
+                "code": 403,
+                "status": "Forbidden",
+            }
+
         def test_it_creates_a_filtering_policy(
             self,
             firewall: Firewall,
@@ -305,6 +330,15 @@ class TestFilteringPoliciesById:
 
             assert response.status_code == 401
 
+        def test_an_authorised_request_is_forbidden(
+            self, unauthorised_client: DefaultHeaderFlaskClient
+        ) -> None:
+            response = unauthorised_client.get(
+                "/firewalls/1/filtering-policies/2/"
+            )
+
+            assert response.status_code == 403
+
         def test_it_returns_the_filtering_policy(
             self,
             firewall: Firewall,
@@ -393,6 +427,15 @@ class TestFilteringPoliciesById:
             )
 
             assert response.status_code == 401
+
+        def test_an_authorised_request_is_forbidden(
+            self, unauthorised_client: DefaultHeaderFlaskClient
+        ) -> None:
+            response = unauthorised_client.delete(
+                "/firewalls/1/filtering-policies/2/"
+            )
+
+            assert response.status_code == 403
 
         def test_it_soft_deletes_the_filtering_policy(
             self,

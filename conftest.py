@@ -8,7 +8,7 @@ from flask_sqlalchemy.session import Session
 from sqlalchemy.orm import scoped_session
 
 from app import initialise_app
-from auth import User, encode_jwt
+from auth import User, UserRole, encode_jwt
 from db import db
 from settings import Settings
 
@@ -74,7 +74,7 @@ class DefaultHeaderFlaskClient(FlaskClient):
 
 @pytest.fixture
 def user() -> User:
-    return User(username="test_user")
+    return User(username="test_user", roles=tuple(UserRole))
 
 
 @pytest.fixture
@@ -97,6 +97,33 @@ def client(
 @pytest.fixture
 def unauthenticated_client(app: Flask) -> DefaultHeaderFlaskClient:
     return cast(DefaultHeaderFlaskClient, app.test_client())
+
+
+@pytest.fixture
+def unauthorised_user() -> User:
+    return User(username="unauthorised_user", roles=())
+
+
+@pytest.fixture
+def unauthorised_user_jwt(settings: Settings, unauthorised_user: User) -> str:
+    return encode_jwt(settings, unauthorised_user)
+
+
+@pytest.fixture
+def unauthorised_auth_headers(
+    settings: Settings, unauthorised_user_jwt: str
+) -> dict[str, str]:
+    return {"Authorization": f"Bearer {unauthorised_user_jwt}"}
+
+
+@pytest.fixture
+def unauthorised_client(
+    app: Flask, unauthorised_auth_headers: dict[str, str]
+) -> DefaultHeaderFlaskClient:
+    return cast(
+        DefaultHeaderFlaskClient,
+        app.test_client(headers=unauthorised_auth_headers),
+    )
 
 
 @pytest.fixture(autouse=True)

@@ -25,6 +25,15 @@ class TestFirewallRules:
 
             assert response.status_code == 401
 
+        def test_an_authorised_request_is_forbidden(
+            self, unauthorised_client: DefaultHeaderFlaskClient
+        ) -> None:
+            response = unauthorised_client.get(
+                "/firewalls/1/filtering-policies/2/rules/"
+            )
+
+            assert response.status_code == 403
+
         def test_it_returns_a_list_of_firewall_rules(
             self,
             firewall: Firewall,
@@ -268,6 +277,15 @@ class TestFirewallRules:
             )
 
             assert response.status_code == 401
+
+        def test_an_authorised_request_is_forbidden(
+            self, unauthorised_client: DefaultHeaderFlaskClient
+        ) -> None:
+            response = unauthorised_client.post(
+                "/firewalls/1/filtering-policies/2/rules/", json={}
+            )
+
+            assert response.status_code == 403
 
         @pytest.fixture
         def payload(self) -> dict[str, Any]:
@@ -547,6 +565,15 @@ class TestFirewallRulesById:
 
             assert response.status_code == 401
 
+        def test_an_authorised_request_is_forbidden(
+            self, unauthorised_client: DefaultHeaderFlaskClient
+        ) -> None:
+            response = unauthorised_client.get(
+                "/firewalls/1/filtering-policies/2/rules/3/"
+            )
+
+            assert response.status_code == 403
+
         def test_it_returns_the_rule(
             self,
             firewall: Firewall,
@@ -637,6 +664,15 @@ class TestFirewallRulesById:
             )
 
             assert response.status_code == 401
+
+        def test_an_authorised_request_is_forbidden(
+            self, unauthorised_client: DefaultHeaderFlaskClient
+        ) -> None:
+            response = unauthorised_client.delete(
+                "/firewalls/1/filtering-policies/2/rules/3/"
+            )
+
+            assert response.status_code == 403
 
         def test_it_soft_deletes_the_rule(
             self,
