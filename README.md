@@ -8,23 +8,16 @@ would do if I were deploying this to Production.
 
 Further improvements would include:
 
-- More unit tests.  At the moment most tests are at the API level.  
-- Much more domain logic as per the requirements of stakeholders.
-- Introduction of domain services to encapsulate business logic.  (At the moment, the simplicity of the domain means that this isn't necessary).
 - Reporting of errors to an external service such as Sentry.
 - Reporting of metrics and tracing to an external service such as Datadog or Prometheus/Grafana.
 - Structured logging to an external service such as Datadog as well as more logs.
-- A more robust authentication and authorisation system.
 - Using PostgreSQL rather than SQLite.
 - Completing the Helm chart (see notes below).
 - Configuring a proper application server such as Gunicorn or uWSGI rather than using the Flask development server.
-- At the moment, authentication is configured via a decorator on each view method.  A better approach would be to 
-  authenticate at the blueprint level.
 - At the moment the test DB gets destroyed between test runs.  A better approach would be to run each test in a transaction
   and roll back the transaction at the end of the test.
 - Maybe avoiding `Flask-SQLAlchemy` and using `SQLAlchemy` directly to avoid the tight coupling to Flask.  
   (This is perhaps controversial.  I'm more than happy to discuss!)
-- More complete validation at the model level and appropriate error handling.
 - A more expressive filtering syntax.
 
 ## Running Locally in [Docker](https://www.docker.com/get-started) 🐳
@@ -55,7 +48,7 @@ docker compose up fireflow
 5. Generate a new test JWT and copy it to your clipboard
 
 ```shell
-make jwt
+docker compose run --rm fireflow make jwt
 ```
 
 6. Configure authentication by clicking the `Authorize` button and entering the JWT 
