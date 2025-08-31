@@ -214,6 +214,60 @@ class TestFilteringPolicy:
         else:
             assert action is filtering_policy.default_action
 
+    class TestPriority:
+        @pytest.fixture
+        def rules(
+            self, filtering_policy: FilteringPolicy, priorities: tuple[int, int]
+        ) -> list[FirewallRule]:
+            return [
+                FirewallRuleFactory.create(
+                    filtering_policy=filtering_policy,
+                    sources__address="100.100.100.0/24",
+                    sources__port=8080,
+                    destinations__address="99.99.99.99",
+                    destinations__port=80,
+                    action=FirewallAction.ALLOW,
+                    priority=priorities[0],
+                ),
+                FirewallRuleFactory.create(
+                    filtering_policy=filtering_policy,
+                    sources__address="100.100.100.0/24",
+                    sources__port=8080,
+                    destinations__address="99.99.99.99",
+                    destinations__port=80,
+                    action=FirewallAction.DENY,
+                    priority=priorities[1],
+                ),
+            ]
+
+        @pytest.fixture
+        def packet(self) -> Packet:
+            return Packet(
+                source_address="100.100.100.100",
+                source_port=8080,
+                destination_address="99.99.99.99",
+                destination_port=80,
+            )
+
+        @pytest.mark.parametrize(
+            ("priorities", "expected"),
+            (
+                ((1, 2), FirewallAction.ALLOW),
+                ((2, 1), FirewallAction.DENY),
+                ((1, 1), FirewallAction.ALLOW),
+                ((-1, 1), FirewallAction.ALLOW),
+                ((1, -1), FirewallAction.DENY),
+            ),
+        )
+        def test_prioritised_rules(
+            self,
+            filtering_policy: FilteringPolicy,
+            packet: Packet,
+            rules: list[FirewallRule],
+            expected: FirewallAction,
+        ) -> None:
+            assert filtering_policy.inspect(packet) is expected
+
     @pytest.mark.parametrize(
         ("name", "is_valid"),
         (("foo", True), ("   foo  ", True), ("", False), ("    ", False)),

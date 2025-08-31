@@ -12,6 +12,7 @@ from firewalls.models import (
     FirewallAction,
     FirewallRule,
 )
+from firewalls.repositories import FirewallRuleOrderBy
 
 
 class TestFirewallRules:
@@ -63,6 +64,7 @@ class TestFirewallRules:
                     },
                 },
                 "action": rule.action.name,
+                "priority": rule.priority,
                 "sources": [
                     {
                         "address": source.address,
@@ -188,6 +190,7 @@ class TestFirewallRules:
                     },
                 },
                 "action": rule.action.name,
+                "priority": rule.priority,
                 "sources": [
                     {
                         "address": source.address,
@@ -208,10 +211,10 @@ class TestFirewallRules:
         @pytest.mark.parametrize(
             ("order_by", "reverse"),
             (
-                ("id", False),
-                ("-id", True),
-                ("action", False),
-                ("-action", True),
+                (
+                    (order_by.value, order_by.value.startswith("-"))
+                    for order_by in FirewallRuleOrderBy
+                )
             ),
         )
         def test_it_sorts_data(
@@ -298,6 +301,7 @@ class TestFirewallRules:
                 ],
                 "ports": [{"number": 8080}],
                 "action": "ALLOW",
+                "priority": 123,
             }
 
         def test_it_creates_a_rule(
@@ -326,6 +330,8 @@ class TestFirewallRules:
             ]
             assert data["ports"] == [{"number": 8080}]
             assert data["action"] == "ALLOW"
+
+            assert data["priority"] == 123
 
         def test_it_ignores_unknown_fields(
             self,
@@ -504,19 +510,11 @@ class TestFirewallRules:
             firewall: Firewall,
             filtering_policy: FilteringPolicy,
             client: FlaskClient,
+            payload: dict[str, Any],
         ) -> None:
             response = client.post(
                 f"/firewalls/{firewall.id + 1}/filtering-policies/{filtering_policy.id}/rules/",
-                json={
-                    "sources": [
-                        {"address": "100.100.100.0/24", "port": 8080},
-                    ],
-                    "destinations": [
-                        {"address": "200.200.200.200", "port": 9090},
-                    ],
-                    "ports": [{"number": 8080}],
-                    "action": "ALLOW",
-                },
+                json=payload,
             )
 
             assert response.status_code == 404, response.json
@@ -531,19 +529,11 @@ class TestFirewallRules:
             firewall: Firewall,
             filtering_policy: FilteringPolicy,
             client: FlaskClient,
+            payload: dict[str, Any],
         ) -> None:
             response = client.post(
                 f"/firewalls/{firewall.id}/filtering-policies/{filtering_policy.id + 1}/rules/",
-                json={
-                    "sources": [
-                        {"address": "100.100.100.0/24", "port": 8080},
-                    ],
-                    "destinations": [
-                        {"address": "200.200.200.200", "port": 9090},
-                    ],
-                    "ports": [{"number": 8080}],
-                    "action": "ALLOW",
-                },
+                json=payload,
             )
 
             assert response.status_code == 404, response.json
@@ -602,6 +592,7 @@ class TestFirewallRulesById:
                     },
                 },
                 "action": rule.action.name,
+                "priority": rule.priority,
                 "sources": [
                     {
                         "address": source.address,

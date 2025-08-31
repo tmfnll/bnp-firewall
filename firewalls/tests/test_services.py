@@ -43,12 +43,17 @@ class TestBuildFirewallRule:
         return FirewallAction.ALLOW
 
     @pytest.fixture
+    def priority(self) -> int:
+        return 123
+
+    @pytest.fixture
     def filtering_policy(self) -> FilteringPolicy:
         return FilteringPolicyFactory.create(rules=[])
 
     def test_it_builds_a_firewall_rule(
         self,
         action: FirewallAction,
+        priority: int,
         firewall_rule_sources: list[FirewallRuleSource],
         firewall_rule_destinations: list[FirewallRuleDestination],
         firewall_rule_ports: list[FirewallRulePort],
@@ -56,6 +61,7 @@ class TestBuildFirewallRule:
     ) -> None:
         rule = build_firewall_rule(
             action=action,
+            priority=priority,
             sources=firewall_rule_sources,
             destinations=firewall_rule_destinations,
             ports=firewall_rule_ports,
@@ -86,6 +92,7 @@ class TestBuildFirewallRule:
     def test_rules_with_the_same_relations_have_matching_hashes(
         self,
         action: FirewallAction,
+        priority: int,
         firewall_rule_sources: list[FirewallRuleSource],
         firewall_rule_destinations: list[FirewallRuleDestination],
         firewall_rule_ports: list[FirewallRulePort],
@@ -93,6 +100,7 @@ class TestBuildFirewallRule:
     ) -> None:
         rule = build_firewall_rule(
             action=action,
+            priority=priority,
             sources=firewall_rule_sources,
             destinations=firewall_rule_destinations,
             ports=firewall_rule_ports,
@@ -101,6 +109,7 @@ class TestBuildFirewallRule:
 
         another_rule = build_firewall_rule(
             action=action,
+            priority=priority,
             sources=firewall_rule_sources,
             destinations=firewall_rule_destinations,
             ports=firewall_rule_ports,
@@ -119,9 +128,10 @@ class TestBuildFirewallRule:
             ("ports",),
         ),
     )
-    def test_a_validation_error_is_raised_when_validations_are_missing(
+    def test_a_validation_error_is_raised_when_data_are_missing(
         self,
         action: FirewallAction,
+        priority: int,
         relation: str,
         firewall_rule_sources: list[FirewallRuleSource],
         firewall_rule_destinations: list[FirewallRuleDestination],
@@ -139,6 +149,7 @@ class TestBuildFirewallRule:
         with pytest.raises(ValidationError) as exc:
             build_firewall_rule(
                 action=action,
+                priority=priority,
                 sources=relations["sources"],
                 destinations=relations["destinations"],
                 ports=relations["ports"],

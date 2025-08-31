@@ -10,6 +10,7 @@ from firewalls.models import (
     Firewall,
     FirewallRule,
 )
+from firewalls.repositories import FilteringPolicyOrderBy
 
 
 class TestFilteringPolicies:
@@ -137,12 +138,10 @@ class TestFilteringPolicies:
         @pytest.mark.parametrize(
             ("order_by", "reverse"),
             (
-                ("id", False),
-                ("-id", True),
-                ("name", False),
-                ("-name", True),
-                ("default_action", False),
-                ("-default_action", True),
+                (
+                    (order_by.value, order_by.value.startswith("-"))
+                    for order_by in FilteringPolicyOrderBy
+                )
             ),
         )
         def test_it_sorts_data(

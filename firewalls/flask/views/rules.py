@@ -122,6 +122,7 @@ class FirewallRules(MethodView):
             rule = create_firewall_rule(
                 CreateFirewallRuleCommand(
                     action=new_rule_data["action"],
+                    priority=new_rule_data["priority"],
                     sources=[
                         CreateFirewallRuleNetworkAddressCommand(**source)
                         for source in new_rule_data["sources"]

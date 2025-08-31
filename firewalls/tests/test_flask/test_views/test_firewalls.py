@@ -10,6 +10,7 @@ from firewalls.models import (
     Firewall,
     FirewallRule,
 )
+from firewalls.repositories import FirewallOrderBy
 
 
 class TestFirewalls:
@@ -104,7 +105,12 @@ class TestFirewalls:
 
         @pytest.mark.parametrize(
             ("order_by", "reverse"),
-            (("id", False), ("-id", True), ("name", False), ("-name", True)),
+            (
+                (
+                    (order_by.value, order_by.value.startswith("-"))
+                    for order_by in FirewallOrderBy
+                )
+            ),
         )
         def test_it_sorts_data(
             self,

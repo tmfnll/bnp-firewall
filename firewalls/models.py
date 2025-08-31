@@ -67,8 +67,12 @@ class FilteringPolicy(BaseModel):
         back_populates="filtering_policy",
     )
 
+    @property
+    def prioritised_rules(self) -> list[FirewallRule]:
+        return sorted(self.rules, key=lambda rule: rule.priority)
+
     def inspect(self, packet: Packet) -> FirewallAction:
-        for rule in self.rules:
+        for rule in self.prioritised_rules:
             action = rule.inspect(packet)
 
             if action is not None:
@@ -157,6 +161,10 @@ class FirewallRule(BaseModel):
     port_hash: Mapped[int] = db.mapped_column(index=True)
 
     action: Mapped[FirewallAction] = db.mapped_column()
+
+    priority: Mapped[int] = db.mapped_column(index=True)
+
+    description: Mapped[str] = db.mapped_column(index=False, default="")
 
     filtering_policy_id: Mapped[int] = db.mapped_column(
         ForeignKey("filtering_policies.id", ondelete="CASCADE"), index=True

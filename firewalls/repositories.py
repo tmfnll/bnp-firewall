@@ -73,7 +73,9 @@ class NestedFilteringPolicyRepository(Repository):
         return select_
 
 
-FirewallRuleOrderBy = order_by_enum("FirewallRuleOrderBy", ["action"])
+FirewallRuleOrderBy = order_by_enum(
+    "FirewallRuleOrderBy", ["action", "priority"]
+)
 
 
 class NestedFirewallRuleRepository(Repository[FirewallRule]):

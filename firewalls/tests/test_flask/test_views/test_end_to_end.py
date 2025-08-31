@@ -75,6 +75,7 @@ def test_firewall_flow(
             "/firewalls/2/filtering-policies/2/rules/",
             json={
                 "action": "ALLOW",
+                "priority": 100,
                 "sources": [{"address": "92.168.1.0/24", "port": 443}],
                 "destinations": [{"address": "92.168.1.0/24", "port": 443}],
                 "ports": [{"number": 443}],
@@ -88,6 +89,7 @@ def test_firewall_flow(
             "/firewalls/2/filtering-policies/2/rules/",
             json={
                 "action": "ALLOW",
+                "priority": 100,
                 "sources": [{"address": "92.168.2.0/24", "port": 443}],
                 "destinations": [{"address": "92.168.2.0/24", "port": 443}],
                 "ports": [{"number": 443}],
@@ -101,6 +103,7 @@ def test_firewall_flow(
             "/firewalls/2/filtering-policies/2/rules/",
             json={
                 "action": "ALLOW",
+                "priority": 100,
                 "sources": [{"address": "92.168.3.0/24", "port": 443}],
                 "destinations": [{"address": "92.168.3.0/24", "port": 443}],
                 "ports": [{"number": 443}],
@@ -115,6 +118,7 @@ def test_firewall_flow(
             "/firewalls/2/filtering-policies/2/rules/",
             json={
                 "action": "ALLOW",
+                "priority": 100,
                 "sources": [{"address": "92.168.3.0/24", "port": 443}],
                 "destinations": [{"address": "92.168.3.0/24", "port": 443}],
                 "ports": [{"number": 443}],

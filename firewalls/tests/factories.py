@@ -1,6 +1,12 @@
 from typing import Any
 
-from factory import Faker, RelatedFactoryList, SubFactory, post_generation
+from factory import (
+    Faker,
+    RelatedFactoryList,
+    Sequence,
+    SubFactory,
+    post_generation,
+)
 from factory.base import Factory
 from factory.fuzzy import FuzzyChoice
 
@@ -77,6 +83,8 @@ class FirewallRuleFactory(Factory):
     )
 
     action = FuzzyChoice(list(FirewallAction))
+
+    priority = Sequence(lambda n: n)
 
     filtering_policy = SubFactory(FilteringPolicyFactory)
 

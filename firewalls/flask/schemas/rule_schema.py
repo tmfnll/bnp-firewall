@@ -34,6 +34,11 @@ class FirewallRulePortSchema(BaseSchema):
     number = PortField(required=True)
 
 
+PRIORITY_DESCRIPTION = (
+    "The priority of the rule, lower numbers indicate higher priority"
+)
+
+
 class FirewallRuleSchema(BaseSchema):
     id = Integer(dump_only=True)
     action = Enum(FirewallAction, required=True)
@@ -55,6 +60,11 @@ class FirewallRuleSchema(BaseSchema):
         FirewallRulePortSchema, many=True, required=True, validate=Length(1)
     )
 
+    priority = Integer(
+        required=True,
+        metadata={"example": 1, "description": PRIORITY_DESCRIPTION},
+    )
+
     filtering_policy = Nested(FirewallRuleFilteringPolicySchema, dump_only=True)
 
 
@@ -65,4 +75,5 @@ class FirewallRuleFilterSchema(QueryParametersSchema):
     destination_address = IpOrSubnetCidrField(example=None)
     destination_port = PortField(example=None)
     port = PortField(example=None)
+    priority = Integer(metadata={"description": PRIORITY_DESCRIPTION})
     order_by = OrderByEnum(FirewallRuleOrderBy)

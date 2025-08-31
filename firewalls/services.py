@@ -23,6 +23,7 @@ def _raise_if_empty(
 def build_firewall_rule(
     filtering_policy: FilteringPolicy,
     action: FirewallAction,
+    priority: int,
     sources: list[FirewallRuleSource],
     destinations: list[FirewallRuleDestination],
     ports: list[FirewallRulePort],
@@ -34,6 +35,7 @@ def build_firewall_rule(
     firewall_rule = FirewallRule(
         filtering_policy=filtering_policy,
         action=action,
+        priority=priority,
         sources=sources,
         destinations=destinations,
         ports=ports,

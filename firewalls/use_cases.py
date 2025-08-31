@@ -82,6 +82,7 @@ class CreateFirewallRuleCommand:
     ports: list[CreateFirewallRulePortCommand]
 
     action: FirewallAction
+    priority: int
 
     filtering_policy_id: int
 
@@ -117,6 +118,7 @@ class CreateFirewallRule(UseCase[CreateFirewallRuleCommand, FirewallRule]):
             ],
             action=command.action,
             filtering_policy=filtering_policy,
+            priority=command.priority,
         )
 
         self.db.session.add(firewall_rule)
