@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError, NoResultFound
 from auth import UserRole, authorise, require_login
 from db import db
 from firewalls.flask.exceptions import (
-    abort_already_exists,
+    abort_integrity_error,
     abort_not_found,
 )
 from firewalls.flask.links import links, operation
@@ -99,8 +99,8 @@ class Firewalls(MethodView):
 
         try:
             return create_firewall(CreateFirewallCommand(**new_firewall))
-        except IntegrityError:
-            abort_already_exists("firewall")
+        except IntegrityError as exc:
+            abort_integrity_error("firewall", exc)
 
 
 @firewalls.route("/<id:firewall_id>/")

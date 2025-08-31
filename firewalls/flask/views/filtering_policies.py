@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError, NoResultFound
 
 from auth import UserRole, authorise
 from db import db
-from firewalls.flask.exceptions import abort_already_exists, abort_not_found
+from firewalls.flask.exceptions import abort_integrity_error, abort_not_found
 from firewalls.flask.links import links, operation
 from firewalls.flask.schemas.base import PageSchema
 from firewalls.models import FilteringPolicy
@@ -120,8 +120,8 @@ class FilteringPolicies(MethodView):
             )
         except NoResultFound:
             abort_not_found("firewall", id=firewall_id)
-        except IntegrityError:
-            abort_already_exists("filtering-policy")
+        except IntegrityError as exc:
+            abort_integrity_error("filtering-policy", exc)
 
         return filtering_policy
 
