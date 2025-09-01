@@ -59,7 +59,7 @@ class FilteringPolicy(BaseModel):
     def validate_name(self, _key: str, name: str) -> str:
         return validate_name(name)
 
-    default_action: Mapped[FirewallAction] = db.mapped_column()
+    default_action: Mapped[FirewallAction] = db.mapped_column(index=True)
 
     firewall_id: Mapped[int] = db.mapped_column(
         ForeignKey("firewalls.id", ondelete="CASCADE"), index=True
@@ -166,7 +166,7 @@ class FirewallRule(BaseModel):
 
     port_hash: Mapped[int] = db.mapped_column(index=True)
 
-    action: Mapped[FirewallAction] = db.mapped_column()
+    action: Mapped[FirewallAction] = db.mapped_column(index=True)
 
     priority: Mapped[int] = db.mapped_column(index=True)
 
