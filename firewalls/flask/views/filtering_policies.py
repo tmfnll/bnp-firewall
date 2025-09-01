@@ -186,9 +186,6 @@ class FilteringPolicyById(MethodView):
 
 @filtering_policies.route("/<id:filtering_policy_id>/inspections/")
 class FirewallInspections(MethodView):
-    """
-    Inspect packets against a `FilteringPolicy`
-    """
     @authorise(UserRole.VIEWER)
     @filtering_policies.arguments(PacketSchema, location="query")
     @filtering_policies.response(200, InspectionSchema)
@@ -196,6 +193,10 @@ class FirewallInspections(MethodView):
     def get(
         self, args: dict[str, Any], firewall_id: int, filtering_policy_id: int
     ) -> dict[str, Any]:
+        """
+        Determine the action taken and rule applied by a `FilteringPolicy` for
+        a given packet
+        """
         repository = NestedFilteringPolicyRepository(firewall_id, db)
 
         try:

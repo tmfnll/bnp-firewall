@@ -28,6 +28,12 @@ def build_firewall_rule(
     destinations: list[FirewallRuleDestination],
     ports: list[FirewallRulePort],
 ) -> FirewallRule:
+    """
+    Instantiate a new FirewallRule object ensuring that the appropriate hash
+    values are correctly set.
+
+    This method should always be used when creating new FirewallRule instances.
+    """
     _raise_if_empty(sources, "sources")
     _raise_if_empty(destinations, "destinations")
     _raise_if_empty(ports, "ports")
