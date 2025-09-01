@@ -59,7 +59,7 @@ def ip_address_field(
     return String(
         *args,
         validate=Regexp(
-            rf"\A{IP_REGEX}\Z",
+            rf"^{IP_REGEX}$",
             error="{input} is not a valid IP address",
         ),
         metadata=metadata,

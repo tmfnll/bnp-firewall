@@ -18,7 +18,7 @@ def not_just_whitespace():
 
 
 class IsValidIPAddressOrSubnetCIDR(Regexp):
-    pattern: ClassVar[str] = rf"\A{ADDRESS_REGEX}\Z"
+    pattern: ClassVar[str] = rf"^{ADDRESS_REGEX}$"
 
     def __init__(self):
         super().__init__(
